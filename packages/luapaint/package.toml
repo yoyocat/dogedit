@@ -1,0 +1,10 @@
+api = 1
+id = "luapaint"
+name = "LuaPaint"
+version = "1.0.0"
+description = "把状态栏、页签、滚动条、工具栏的画法全交给脚本，外加三块自己的停靠窗格"
+order = 90
+
+# 两个文件：画法在前、元素在后。写 `scripts` 是为了「哪些文件会跑、按什么
+# 顺序」是个能打印出来的事实 —— 不写也一样：目录下所有 *.lua 按文件名排序。
+scripts = ["paint.lua", "panels.lua"]

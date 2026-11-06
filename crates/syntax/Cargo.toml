@@ -1,0 +1,24 @@
+[package]
+name = "dg-syntax"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+# 画字词汇（STYLE_* / HighlightRun）在零依赖叶子 crate 里，dg-render 也用。
+dg-paint = { path = "../paint" }
+tree-sitter.workspace = true
+tree-sitter-language.workspace = true
+# 解析器插件包：manifest.toml 解析 + DLL 动态加载（parser_plugin_plan.md §2/§3）。
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+libloading.workspace = true
+# 解析器下载：注册表（registry.json）解析 + 包 zip 的校验安装（install.rs）。
+zip = { workspace = true }
+sha2 = { workspace = true }
+
+# 只在测试里用：单元测试需要一个真 grammar 才能解析/查询，发行版
+# 二进制不带任何 grammar（全部来自 parsers\ 插件包）。
+[dev-dependencies]
+tree-sitter-json = "0.24"
+tree-sitter-rust = "0.24"

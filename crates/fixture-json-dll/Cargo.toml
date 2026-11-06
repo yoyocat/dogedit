@@ -1,0 +1,15 @@
+[package]
+name = "fixture-json-dll"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+# 测试夹具（parser_plugin_plan.md §9）：把 tree_sitter_json 的语言函数经本
+# DLL 再导出，让 dg-syntax 的动态加载测试走真·LoadLibrary 全链路。
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# 夹具自己的 grammar 依赖：只服务于测试，不进主程序。
+tree-sitter-json = "0.24"
+tree-sitter-language.workspace = true

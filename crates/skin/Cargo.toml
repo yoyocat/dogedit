@@ -1,0 +1,7 @@
+[package]
+name = "dg-skin"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+dg-render = { path = "../render" }

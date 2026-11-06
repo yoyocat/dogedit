@@ -1,0 +1,10 @@
+[package]
+name = "dg-ui"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+dg-core = { path = "../core" }
+dg-render = { path = "../render" }
+# 皮肤度量（`[metrics] split.band_h/v`）：布局要读它，所以这里也得认识。
+dg-skin = { path = "../skin" }

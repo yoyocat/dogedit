@@ -1,0 +1,25 @@
+#title=Lua
+
+#t=Function
+#g=func
+local function ${1:name}($2)
+	${0}
+end
+
+#t=For loop
+#g=for
+for ${1:i} = 1, ${2:n} do
+	${0}
+end
+
+#t=If
+#g=if
+if ${1:condition} then
+	${0}
+end
+
+#t=Table
+#g=table
+local ${1:name} = {
+	${2:key} = ${3:value},
+}

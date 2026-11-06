@@ -1,0 +1,6 @@
+# 生成产物（registry.json 与 pkg/*.zip）不进版本库：第三方二进制 + 体积，
+# 由 tools/make_registry.py 随时重建。_headers 与 .assetsignore 是手写策略，保留。
+*
+!.gitignore
+!_headers
+!.assetsignore

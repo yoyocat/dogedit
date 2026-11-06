@@ -1,0 +1,2 @@
+# wrangler 本地状态（miniflare 缓存与 sqlite），只在本机有存在价值
+.wrangler/

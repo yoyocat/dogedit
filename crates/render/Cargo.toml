@@ -1,0 +1,9 @@
+[package]
+name = "dg-render"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+dg-core = { path = "../core" }
+dg-layout = { path = "../layout" }
+dg-paint = { path = "../paint" }

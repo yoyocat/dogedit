@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="DogEdit">
+  <defs>
+    <linearGradient id="paw" x1="12" y1="26" x2="118" y2="106" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0B5FFB"/>
+      <stop offset="0.5" stop-color="#08A6F8"/>
+      <stop offset="1" stop-color="#06DDF9"/>
+    </linearGradient>
+  </defs>
+  <g fill="url(#paw)">
+    <ellipse cx="45.2" cy="35" rx="16" ry="18.8" transform="rotate(-11 45.2 35)"/>
+    <ellipse cx="82.4" cy="35" rx="16" ry="18.8" transform="rotate(11 82.4 35)"/>
+    <ellipse cx="22.6" cy="64" rx="15.6" ry="16.4" transform="rotate(-35 22.6 64)"/>
+    <ellipse cx="105" cy="64" rx="15.6" ry="16.4" transform="rotate(35 105 64)"/>
+    <path d="M63.7 56.6
+             C54 56.6 47 64 38 76.3
+             C34 86 26.6 90.5 25.5 97
+             C25.2 100.5 25.6 104 27 107
+             C28.7 110.8 30.8 112.4 34.5 113.4
+             C38.5 114.4 43 113.3 47.5 111.4
+             C52.5 109.2 57.5 108.1 61 107.9
+             L63.7 107.8 L66.4 107.9
+             C69.9 108.1 74.9 109.2 79.9 111.4
+             C84.4 113.3 88.9 114.4 92.9 113.4
+             C96.6 112.4 98.7 110.8 100.4 107
+             C101.8 104 102.2 100.5 101.9 97
+             C100.8 90.5 93.4 86 89.4 76.3
+             C80.4 64 73.4 56.6 63.7 56.6 Z"/>
+  </g>
+  <path fill="#fff" d="M55.8 70.2h14.8a2.3 2.3 0 0 1 0 4.6H66.1v22.6h4.5a2.3 2.3 0 0 1 0 4.6H55.8a2.3 2.3 0 0 1 0-4.6h4.5V74.8h-4.5a2.3 2.3 0 0 1 0-4.6Z"/>
+</svg>

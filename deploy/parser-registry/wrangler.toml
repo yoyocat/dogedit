@@ -1,0 +1,10 @@
+# 「解析器下载」服务端：/api/* 先进 Worker（src/worker.js），其余路径
+# 直接命中 public/ 下的静态资源（registry.json 与 pkg/*.zip）。
+name = "dogedit-parsers"
+main = "src/worker.js"
+compatibility_date = "2026-01-15"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = ["/api/*"]

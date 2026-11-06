@@ -1,0 +1,27 @@
+# 换行符统一为 LF
+#
+# 仓库里所有文本文件一律以 LF 存储、以 LF 检出，不随平台变化。这样 `git diff`
+# 不会因为某台机器上的编辑器改了行尾而出现整文件假改动。
+# 加新文件前不用手工确认：`text=auto` 让 Git 自己判断文本/二进制。
+
+* text=auto eol=lf
+
+# 二进制资源：不做换行符转换，也不参与文本 diff
+*.bmp binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.svg text
+*.exe binary
+*.dll binary
+*.pdb binary
+*.zip binary
+*.i64 binary
+*.bin binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary

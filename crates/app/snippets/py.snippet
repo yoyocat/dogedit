@@ -1,0 +1,34 @@
+#title=Python
+
+#t=Function
+#g=def
+def ${1:name}($2):
+	${0:pass}
+
+#t=Class
+#g=class
+class ${1:Name}(${2:object}):
+	def __init__(self$3):
+		${0:pass}
+
+#t=For loop
+#g=for
+for ${1:item} in ${2:items}:
+	${0:pass}
+
+#t=If main
+#g=ifmain
+if __name__ == '__main__':
+	${1:main()}$0
+
+#t=Try/except
+#g=try
+try:
+	${1:body}
+	except ${2:Exception} as exc:
+	${0:raise}
+
+#t=With open
+#g=with
+with open(${1:path}, ${2:'r'}) as f:
+	${0:data = f.read()}

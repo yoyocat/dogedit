@@ -1,0 +1,29 @@
+#title=JavaScript
+
+#t=Function
+#g=fn
+function ${1:name}($2) {
+	${0:return;}
+}
+
+#t=Arrow
+#g=arrow
+const ${1:name} = (${2:args}) => {
+	${0:return;}
+};
+
+#t=For of
+#g=forof
+for (const ${1:item} of ${2:items}) {
+	${0:body}
+}
+
+#t=Console log
+#g=log
+console.log(${1:value});
+
+#t=Promise chain
+#g=then
+${1:promise}
+	.then((${2:value}) => ${3:value})
+	.catch((${4:err}) => ${0:console.error(${4:err})});

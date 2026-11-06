@@ -1,0 +1,24 @@
+#title=AutoHotkey
+
+#t=Hotkey
+#g=hotkey
+#${1:^}!${2:key}::
+	${0:return}
+
+#t=Message box
+#g=msgbox
+MsgBox, ${1:text}
+
+#t=Loop
+#g=loop
+Loop, ${1:count}
+{
+	${0}
+}
+
+#t=Function
+#g=fn
+${1:Name}(${2:params})
+{
+	${0}
+}

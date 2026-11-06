@@ -1,0 +1,9 @@
+[package]
+name = "dg-paint"
+version.workspace = true
+edition.workspace = true
+
+# 没有依赖：这个 crate 只放 tokenizer 与绘制器之间那几个纯数据类型。
+# dg-syntax（tree-sitter / libloading / zip / sha2）和 dg-render 都依赖它，
+# 谁也不必为了 8 个常量去拖另一棵依赖树。
+[dependencies]

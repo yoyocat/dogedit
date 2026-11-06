@@ -1,0 +1,45 @@
+dogedit
+Copyright (c) 2026 dogedit contributors
+
+The MIT license covers the program source in this repository and the generators
+in tools/. The sprite sheets are composed from the Tabler Icons set, whose MIT
+license and attribution sit in `crates/app/assets/icons/LICENSE` and
+`SOURCES.txt`; the theme colour palettes are drawn from this project's own
+tables.
+
+The bundled data tables are a compatibility surface rather than an original
+work, and the license makes no claim about their wording:
+
+- `lang/en-US.lng`, `lang/zh-CN.lng` — the caption text is the reference
+  program's. The Chinese table is also the key space the Chinese literals
+  compiled into the code are matched against. `tools/make_lang.py` re-emits
+  metadata, section order and UTF-8 encoding; it does not write the captions.
+- `themes/*.ini` — the `[Theme]` role keys, the `[Style]` Bold/Italic/Underline
+  bits and the theme file names follow the reference program's. The colour
+  values are this project's own.
+- `crates/app/snippets/*.snippet` — the file names follow the reference
+  program's; the entry tables are this project's own.
+
+They ship in that form so an existing `setting.ini`, `key.ini`, `history.ini` or
+`.lng` file loads unchanged.
+
+Third-party software:
+
+- Tabler Icons 3.50.0 (https://tabler.io/icons) — MIT, Copyright (c) 2020-2026
+  Paweł Kuna; the toolbar, output-bar and tab-strip artwork in
+  `crates/app/assets/sprites/` is composed from its exports, and the full
+  license text ships in `crates/app/assets/icons/LICENSE`
+- nvim-treesitter (https://github.com/nvim-treesitter/nvim-treesitter) —
+  Apache-2.0; `queries/*/folds.scm` is derived from its `runtime/queries`
+  tree, with the `; inherits:` lines expanded and node names matched to the
+  grammars pinned in `parsers/`; the full license text ships in
+  `queries/LICENSE` and each file names the upstream commit it came from
+- tree-sitter and the tree-sitter grammar crates used in tests — MIT
+- mlua / Lua 5.4 — MIT
+- windows, windows-core, windows-numerics — MIT OR Apache-2.0
+- encoding_rs, chardetng, regex, serde, serde_json, toml, lsp-server,
+  lsp-types, crossbeam-channel, parking_lot, bitflags, libloading, ropey —
+  MIT / Apache-2.0 as declared by each crate
+
+No executable binaries are bundled. The optional ctags symbol index uses a
+user-installed `ctags` from PATH.

@@ -1,0 +1,20 @@
+#title=NSIS
+
+#t=Section
+#g=section
+Section "${1:Name}"
+	${0}
+SectionEnd
+
+#t=Set output
+#g=outfile
+OutFile "${1:installer.exe}"
+
+#t=Page
+#g=page
+Page directory
+Page instfiles
+
+#t=File
+#g=file
+File "${1:path}"

@@ -1,0 +1,19 @@
+[package]
+name = "dg-core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+parking_lot.workspace = true
+bitflags.workspace = true
+encoding_rs.workspace = true
+crossbeam-channel.workspace = true
+regex.workspace = true
+memchr = "2"
+dg-large = { path = "../large" }
+
+[target.'cfg(windows)'.dependencies]
+# 转换编码's conversion pair for the codepages encoding_rs cannot
+# reproduce
+# codepages.
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Globalization"] }

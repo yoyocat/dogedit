@@ -1,0 +1,7 @@
+[package]
+name = "dg-layout"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+dg-core = { path = "../core" }

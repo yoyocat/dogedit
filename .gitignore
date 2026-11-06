@@ -1,0 +1,24 @@
+/target
+/dist
+dbg.log
+err.txt
+out.txt
+build_out.txt
+crash_err.txt
+
+# 解析器插件包目录：由 tools/make_parsers.py 从 Helix 发行包生成
+# （第三方二进制 + 约 80 MB），不进版本库。重建见 docs/parsers_example/README.md。
+/parsers
+
+# 工作台的会话状态与记忆文件，不是源码
+/.workbuddy-ai
+
+*.pdb
+*.log
+.DS_Store
+Thumbs.db
+__pycache__/
+*.pyc
+
+# Pages 发布时从 docs/ 拷入；本地预览也可自行生成，不进版本库
+/site/docs/

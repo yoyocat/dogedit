@@ -1,0 +1,7 @@
+# 带版本号的包路径永不变化，缓一年；registry.json 五分钟 + 过期后台续，
+# 让「管理框刷新」的整表请求基本落在边缘，不回源。
+/pkg/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/registry.json
+  Cache-Control: public, max-age=300, stale-while-revalidate=86400

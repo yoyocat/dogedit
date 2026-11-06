@@ -1,0 +1,1961 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>DogEdit 用户手册</title>
+<style>
+:root{
+  --bg:#ffffff; --bg2:#f6f8fa; --fg:#1f2328; --fg2:#57606a;
+  --acc:#0969da; --acc2:#ddf4ff; --bd:#d0d7de; --code:#f6f8fa;
+  --kbd:#eaeef2; --note:#fff8c5; --notebd:#d4a72c;
+  --warn:#ffebe9; --warnbd:#cf222e; --ok:#dafbe1; --okbd:#1a7f37;
+  --todo:#f1f8ff; --zebra:rgba(0,0,0,.015);
+  --expbg:#fff1e5; --expfg:#953800; --expbd:#f0883e;
+  color-scheme:light;
+}
+:root[data-theme="dark"]{
+  --bg:#0d1117; --bg2:#161b22; --fg:#e6edf3; --fg2:#8b949e;
+  --acc:#58a6ff; --acc2:#1b3a5c; --bd:#30363d; --code:#161b22;
+  --kbd:#21262d; --note:#2f2712; --notebd:#d4a72c;
+  --warn:#34161a; --warnbd:#f85149; --ok:#122b1d; --okbd:#3fb950;
+  --todo:#0f2744; --zebra:rgba(255,255,255,.035);
+  --expbg:#3a1f0a; --expfg:#f0883e; --expbd:#f0883e;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: dark){
+  :root[data-theme="auto"]{
+    --bg:#0d1117; --bg2:#161b22; --fg:#e6edf3; --fg2:#8b949e;
+    --acc:#58a6ff; --acc2:#1b3a5c; --bd:#30363d; --code:#161b22;
+    --kbd:#21262d; --note:#2f2712; --notebd:#d4a72c;
+    --warn:#34161a; --warnbd:#f85149; --ok:#122b1d; --okbd:#3fb950;
+    --todo:#0f2744; --zebra:rgba(255,255,255,.035);
+    --expbg:#3a1f0a; --expfg:#f0883e; --expbd:#f0883e;
+    color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:24px}
+body{margin:0;font:15px/1.75 "Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;color:var(--fg);background:var(--bg)}
+a{color:var(--acc);text-decoration:none}
+a:hover{text-decoration:underline}
+#layout{display:flex;min-height:100vh}
+nav#toc{width:312px;flex:0 0 312px;position:sticky;top:0;height:100vh;overflow-y:auto;
+  border-right:1px solid var(--bd);background:var(--bg2);padding:18px 14px 40px}
+main{flex:1;min-width:0;padding:28px 40px 120px;max-width:980px}
+@media (max-width:1080px){
+  #layout{display:block}
+  nav#toc{position:static;width:auto;height:auto;flex:none;border-right:none;border-bottom:1px solid var(--bd)}
+  main{padding:20px 18px 80px}
+}
+#toc h1{font-size:17px;margin:2px 6px 10px}
+#toc h1 small{display:block;font-weight:400;color:var(--fg2);font-size:12px}
+#tocsearch{width:100%;padding:6px 9px;margin:0 0 10px;border:1px solid var(--bd);border-radius:6px;font:inherit;font-size:13px;background:var(--bg)}
+#themebtn{width:100%;padding:6px 9px;margin:0 0 10px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--fg);font:inherit;font-size:13px;cursor:pointer;text-align:left}
+#themebtn:hover{background:var(--acc2)}
+#toc ol{list-style:none;margin:0;padding:0}
+#toc>ol>li{margin-top:3px}
+#toc a{display:block;padding:4px 8px;border-radius:6px;color:var(--fg);font-size:13.5px;line-height:1.45}
+#toc a:hover{background:var(--acc2);text-decoration:none}
+#toc a.sub{padding-left:24px;color:var(--fg2);font-size:12.5px}
+#toc .dim{display:none}
+h2{font-size:26px;margin:0 0 6px;padding-bottom:8px;border-bottom:2px solid var(--bd)}
+h3{font-size:19px;margin:34px 0 10px}
+h4{font-size:16px;margin:26px 0 8px}
+section.chapter{margin-bottom:64px}
+p{margin:8px 0}
+ul,ol{margin:8px 0;padding-left:26px}
+li{margin:3px 0}
+.lead{color:var(--fg2);margin:4px 0 18px}
+code{font-family:Consolas,"Cascadia Mono",monospace;font-size:.92em;background:var(--code);border:1px solid var(--bd);border-radius:4px;padding:1px 5px;white-space:nowrap}
+pre{background:var(--code);border:1px solid var(--bd);border-radius:8px;padding:12px 14px;overflow:auto;font-size:13px;line-height:1.55}
+pre code{background:none;border:none;padding:0;white-space:pre}
+kbd{font-family:Consolas,monospace;font-size:.85em;background:var(--kbd);border:1px solid var(--bd);border-bottom-width:2px;border-radius:5px;padding:1px 6px;white-space:nowrap;color:var(--fg)}
+table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13.5px}
+th,td{border:1px solid var(--bd);padding:6px 10px;text-align:left;vertical-align:top}
+th{background:var(--bg2);white-space:nowrap}
+tr:nth-child(even) td{background:var(--zebra)}
+.nowrap{white-space:nowrap}
+.box{border:1px solid var(--bd);border-left:4px solid var(--acc);border-radius:8px;padding:10px 14px;margin:14px 0;background:var(--todo)}
+.box.note{border-left-color:var(--notebd);background:var(--note)}
+.box.warn{border-left-color:var(--warnbd);background:var(--warn)}
+.box.ok{border-left-color:var(--okbd);background:var(--ok)}
+.box b:first-child{display:block;margin-bottom:2px}
+.badge{display:inline-block;font-size:11px;font-weight:600;border-radius:10px;padding:0 8px;vertical-align:1px;white-space:nowrap}
+.badge.na{background:var(--warn);color:var(--warnbd);border:1px solid var(--warnbd)}
+.badge.ok{background:var(--ok);color:var(--okbd);border:1px solid var(--okbd)}
+.badge.exp{background:var(--expbg);color:var(--expfg);border:1px solid var(--expbd)}
+.mock{font-family:Consolas,monospace;font-size:12.5px;line-height:1.5;background:var(--code);border:1px solid var(--bd);border-radius:8px;padding:12px 16px;overflow:auto;white-space:pre}
+@media print{
+  nav#toc{display:none} main{max-width:none;padding:0}
+  section.chapter{page-break-before:always}
+  body{font-size:12px}
+  :root,:root[data-theme="auto"],:root[data-theme="dark"]{--bg:#fff;--bg2:#fff;--fg:#1f2328;--fg2:#57606a;--acc:#0969da;--acc2:#e8f2fd;--bd:#ccc;--code:#f6f8fa;--kbd:#eee;--note:#fff8c5;--notebd:#d4a72c;--warn:#ffebe9;--warnbd:#cf222e;--ok:#dafbe1;--okbd:#1a7f37;--todo:#f1f8ff;--zebra:rgba(0,0,0,.02);--expbg:#fff1e5;--expfg:#953800;--expbd:#f0883e;color-scheme:light}
+}
+</style>
+<script>(function(){try{document.documentElement.setAttribute('data-theme',localStorage.getItem('dg-manual-theme')||'auto');}catch(e){}})();</script>
+</head>
+<body>
+<div id="layout">
+<nav id="toc">
+<h1>DogEdit 用户手册
+<small>适用于当前开发版 · 依据源码整理</small></h1>
+<button id="themebtn" type="button" title="循环切换:跟随系统 → 浅色 → 深色">◐ 主题:跟随系统</button>
+<input id="tocsearch" type="search" placeholder="筛选目录…" aria-label="筛选目录">
+<ol>
+<li><a href="#intro">1 前言</a>
+  <ol>
+  <li><a class="sub" href="#about">1.1 DogEdit 是什么</a></li>
+  <li><a class="sub" href="#conventions">1.2 本手册的约定</a></li>
+  <li><a class="sub" href="#status">1.3 功能完成度标注</a></li>
+  </ol></li>
+<li><a href="#quickstart">2 快速上手</a>
+  <ol>
+  <li><a class="sub" href="#install">2.1 安装与目录</a></li>
+  <li><a class="sub" href="#firstlaunch">2.2 启动与退出</a></li>
+  <li><a class="sub" href="#ui-overview">2.3 界面总览</a></li>
+  <li><a class="sub" href="#five-min">2.4 五分钟上手</a></li>
+  </ol></li>
+<li><a href="#files">3 文件操作</a></li>
+<li><a href="#editing">4 编辑文本</a>
+  <ol>
+  <li><a class="sub" href="#basic-edit">4.1 输入、插入与覆写</a></li>
+  <li><a class="sub" href="#undo">4.2 撤销与重做</a></li>
+  <li><a class="sub" href="#clipboard">4.3 剪贴板与粘贴</a></li>
+  <li><a class="sub" href="#delete-ops">4.4 删除</a></li>
+  <li><a class="sub" href="#line-ops">4.5 行操作</a></li>
+  <li><a class="sub" href="#convert-ops">4.6 转换</a></li>
+  <li><a class="sub" href="#format-ops">4.7 格式:缩进、注释、对齐</a></li>
+  <li><a class="sub" href="#tools-inline">4.8 日期时间、Base64、求和、统计</a></li>
+  <li><a class="sub" href="#typing-aids">4.9 输入辅助</a></li>
+  </ol></li>
+<li><a href="#selection">5 选择、多光标与列模式</a></li>
+<li><a href="#find">6 查找与替换</a>
+  <ol>
+  <li><a class="sub" href="#findbar">6.1 查找条</a></li>
+  <li><a class="sub" href="#findopts">6.2 查找选项与正则</a></li>
+  <li><a class="sub" href="#findall">6.3 查找全部</a></li>
+  <li><a class="sub" href="#quickselect">6.4 快速选择(多光标选取)</a></li>
+  <li><a class="sub" href="#grepdlg">6.5 在文件中查找和替换</a></li>
+  <li><a class="sub" href="#findresult">6.6 查找结果面板</a></li>
+  </ol></li>
+<li><a href="#navigate">7 跳转与导航</a></li>
+<li><a href="#bookmark">8 书签、标记与高亮</a></li>
+<li><a href="#fold">9 代码折叠</a></li>
+<li><a href="#wrap">10 自动换行与文档模式</a></li>
+<li><a href="#syntax">11 语法高亮、文件类型与解析器</a>
+  <ol>
+  <li><a class="sub" href="#changetype">11.1 切换文件类型</a></li>
+  <li><a class="sub" href="#parserpkg">11.2 解析器包</a></li>
+  <li><a class="sub" href="#parsermarket">11.3 解析器下载</a></li>
+  <li><a class="sub" href="#syntaxdlg">11.4 语法着色(包管理)</a></li>
+  <li><a class="sub" href="#syntaxlimits">11.5 注意事项</a></li>
+  </ol></li>
+<li><a href="#complete">12 自动完成与代码片段</a></li>
+<li><a href="#lsp">13 LSP 语言服务</a></li>
+<li><a href="#encoding">14 编码、BOM 与换行符</a></li>
+<li><a href="#large">15 超大文件模式</a></li>
+<li><a href="#hex">16 十六进制视图</a></li>
+<li><a href="#panels">17 停靠面板</a></li>
+<li><a href="#tabs">18 文档标签与窗口管理</a></li>
+<li><a href="#appearance">19 界面外观</a>
+  <ol>
+  <li><a class="sub" href="#themes">19.1 主题</a></li>
+  <li><a class="sub" href="#darkmode">19.2 深色主题</a></li>
+  <li><a class="sub" href="#fonts">19.3 字体与字号</a></li>
+  <li><a class="sub" href="#viewflags">19.4 显示开关</a></li>
+  <li><a class="sub" href="#toolbarui">19.5 工具栏</a></li>
+  <li><a class="sub" href="#statusbarui">19.6 状态栏</a></li>
+  <li><a class="sub" href="#minimap">19.7 文档地图与标尺</a></li>
+  <li><a class="sub" href="#skins">19.8 皮肤(脚本包)</a></li>
+  </ol></li>
+<li><a href="#tools">20 工具</a>
+  <ol>
+  <li><a class="sub" href="#exttools">20.1 外部工具</a></li>
+  <li><a class="sub" href="#sort">20.2 排序</a></li>
+  <li><a class="sub" href="#misc-tools">20.3 其它工具</a></li>
+  </ol></li>
+<li><a href="#macro">21 宏与 Lua 脚本</a></li>
+<li><a href="#safety">22 文件安全:备份、会话与恢复</a></li>
+<li><a href="#options">23 「选项」对话框逐页参考</a></li>
+<li><a href="#keys">24 快捷键参考</a></li>
+<li><a href="#cli">25 命令行参考</a></li>
+<li><a href="#datafiles">26 数据文件参考</a></li>
+<li><a href="#limits">27 当前版本尚未提供的功能</a></li>
+<li><a href="#faq">28 常见问题</a></li>
+<li><a href="#appendix">29 附录</a></li>
+</ol>
+</nav>
+<main>
+
+<!-- ==================== 1 前言 ==================== -->
+<section class="chapter" id="intro">
+<h2>1 前言</h2>
+<p class="lead">欢迎使用 DogEdit——一个用 Rust 编写的原生文本编辑器。当前版本运行在 Windows；核心与窗口系统解耦，Linux 与 macOS 会在后续版本支持，届时复用同一套编辑能力与脚本接口。</p>
+
+<h3 id="about">1.1 DogEdit 是什么</h3>
+<p>DogEdit 是一款面向文本与代码编辑的桌面应用:当前接的是 Windows 原生外壳,外壳之下是平台无关的编辑核心(文档模型、自动换行布局、语法着色、渲染、LSP、脚本),后续可换接其它平台的外壳。它不依赖任何运行时环境,单个可执行文件连同随包数据文件即可运行。</p>
+<p>主要能力一览:</p>
+<ul>
+<li><b>编辑核心</b>:撤销/重做、多重选区与多光标、列模式、代码折叠、书签、行工具(排序/去重/对齐/注释等)、正则查找替换、在多个文件中查找替换。</li>
+<li><b>语法高亮</b>:基于 tree-sitter 的语法解析,解析器以插件包形式随用随装(应用内下载、离线镜像、手工放置均支持)。</li>
+<li><b>大文件</b>:超过 50 MB 的文件自动进入专用大文件模式,不整体载入内存,支持尾随日志等流式工作流。</li>
+<li><b>十六进制视图</b>:以四种进制直接编辑字节,支持插入/覆写两种模式与原子保存。</li>
+<li><b>编码</b>:BOM/UTF-16/UTF-8 自动识别、统计探测,内置 98 项代码页清单与收藏夹。</li>
+<li><b>语言服务(LSP)</b>:与 PATH 上的语言服务器对接,提供补全、跳转定义、悬停、签名帮助等。</li>
+<li><b>脚本</b>:Lua 5.4 沙箱,支持脚本包、宏脚本、界面皮肤脚本,热重载。</li>
+<li><b>安全网</b>:自动备份与版本历史、会话与热保存、崩溃恢复。</li>
+<li><b>外观</b>:主题(颜色/几何/字体/形状四维定制)、深色模式、文档地图、覆盖式滚动条、DirectWrite/Direct2D 渲染。</li>
+</ul>
+<p>本程序遵循 MIT 许可证,详见仓库中的 <code>LICENSE</code> 与 <code>NOTICE</code>。</p>
+
+<h3 id="conventions">1.2 本手册的约定</h3>
+<table>
+<tr><th>写法</th><th>含义</th></tr>
+<tr><td><span class="nowrap">「文件」→「打开」</span></td><td>菜单路径:先点顶层菜单「文件」,再点其中「打开」一项。</td></tr>
+<tr><td><kbd>Ctrl+O</kbd></td><td>键盘快捷键;<kbd>C</kbd>=Ctrl、<kbd>S</kbd>=Shift、<kbd>A</kbd>=Alt,<kbd>F3</kbd> 为功能键。</td></tr>
+<tr><td><kbd>Ctrl+K</kbd>,<kbd>Ctrl+1</kbd></td><td>二段式组合(和弦):先按前一段(可松开),再按后一段。</td></tr>
+<tr><td><code>setting.ini</code></td><td>配置文件中的一段;键名与取值照抄即可。</td></tr>
+<tr><td><span class="badge na">尚未提供</span></td><td>菜单里能看到该行、但当前版本尚未实现,点击无效(通常显示为灰色)。</td></tr>
+</table>
+<p>手册中的界面文案(菜单名、按钮名、提示文字)均逐字引自程序本身。</p>
+
+<h3 id="status">1.3 功能完成度标注</h3>
+<p>DogEdit 仍在快速开发中。为了不误导使用,本手册对「菜单上可见但尚未接线」的功能统一标注 <span class="badge na">尚未提供</span>,并在 <a href="#limits">第 27 章</a>汇总。已实现的功能均按实际行为描述;个别行为与描述有出入时,以程序实际表现为准。</p>
+</section>
+
+<!-- ==================== 2 快速上手 ==================== -->
+<section class="chapter" id="quickstart">
+<h2>2 快速上手</h2>
+
+<h3 id="install">2.1 安装与目录</h3>
+<p>DogEdit 以<b>便携版</b>(绿色版)发行:解压 zip 到任意目录即可运行,不写注册表、不安装服务(只有两个可选的右键菜单项会写注册表,见 <a href="#opt-general">23.1 常规页</a>)。解压后的顶层目录:</p>
+<pre><code>dogedit\
+├─ dogedit.exe        主程序
+├─ setting.ini        设置(空文件,首次运行起开始落盘)
+├─ key.ini            快捷键(可直接编辑)
+├─ template.ini       新建文件模板定义
+├─ template\          模板内容文件
+├─ lang\              界面语言表(zh-CN / en-US)
+├─ themes\            配色主题
+├─ packages\          随包脚本包(如示例包 LuaPaint)
+└─ parsers\           解析器包(便携包默认不带,建议应用内下载)</code></pre>
+<div class="box note"><b>setting.ini 必须存在</b>
+程序只在「读到的那个 setting.ini」上写回配置;文件不存在时所有设置写入都会放弃。便携包自带一个只含 <code>[Setting]</code> 的空文件,请不要删除它。若在开发目录里直接运行而没有这个文件,可手工新建一个。</div>
+<p>除 exe 旁边的文件外,程序还会使用这些位置(详见 <a href="#datafiles">第 26 章</a>):</p>
+<table>
+<tr><th>位置</th><th>用途</th></tr>
+<tr><td><code>%LOCALAPPDATA%\DogEdit\backup</code></td><td>自动备份与版本历史</td></tr>
+<tr><td><code>%LOCALAPPDATA%\DogEdit\session</code></td><td>会话快照与「热保存」内容</td></tr>
+<tr><td><code>%LOCALAPPDATA%\DogEdit\packages</code></td><td>用户安装的脚本包</td></tr>
+<tr><td><code>%LOCALAPPDATA%\DogEdit\parsercache.json</code></td><td>解析器下载列表的缓存</td></tr>
+<tr><td><code>%APPDATA%\dogedit\parsers</code></td><td>用户安装的解析器包</td></tr>
+<tr><td><code>%APPDATA%\dogedit\iconthemes</code></td><td>工具栏图标主题</td></tr>
+</table>
+
+<h3 id="firstlaunch">2.2 启动与退出</h3>
+<ul>
+<li><b>启动</b>:双击 <code>dogedit.exe</code>。也可以把文件拖到 exe 上、或在命令行 <code>dogedit.exe 文件名</code> 直接打开文件(命令行文件在会话恢复之后最后打开)。程序没有单实例限制,可以同时开多个窗口。</li>
+<li><b>新建实例</b>:「文件」→「新建实例」再启动一份程序,当前窗口的标签页一个都不动;新窗口不带文件参数,按自己的会话设置启动(默认是一个空白文档)。以 <code>--safe-mode</code> 启动时,新开的实例也是安全模式。</li>
+<li><b>打开文件的方式</b>:「文件」→「打开」、拖放文件到窗口、目录树双击、「跳转」对话框(Ctrl+P)模糊搜索等。扩展名命中 <code>[HEX] Ext</code>(默认 <code>dat;exe;bin;dll;hex;zip;rar</code>)的文件会直接以十六进制视图打开。</li>
+<li><b>退出</b>:「文件」→「退出」或 <kbd>Alt+F4</kbd>。退出时会先写下会话快照(打开的文件清单、光标、书签、以及「热保存」的未存内容),再逐个询问未保存的文档。</li>
+<li><b>关机退出</b>:Windows 注销/关机同样会保存窗口位置与会话快照。</li>
+</ul>
+
+<h3 id="ui-overview">2.3 界面总览</h3>
+<p>主窗口自上而下:</p>
+<div class="mock">┌──────────────────────────────────────────────────────────┐
+│ 标题栏  DogEdit - [文件名*]                     ─ □ ✕    │  深浅跟随主题
+├──────────────────────────────────────────────────────────┤
+│ 文件(F) 编辑(E) 查看(V) 查找(S) 文档(D) 工程(P)          │  主菜单栏
+│           工具(T) 扩展(A) 窗口(I) 帮助(H)                │
+├──────────────────────────────────────────────────────────┤
+│ 工具栏  新建 打开 保存 | 撤销 重做 | …                    │  可隐藏/换位
+├──────────────────────────────────────────────────────────┤
+│ [a.rs*] [notes.txt] [main.py*]                    ◀ ▶ ▾  │  文档标签条
+├───────────┬──────────────────────────────────┬───────────┤
+│ 左侧停靠  │                                  │ 右侧停靠  │
+│ · 目录树  │         编 辑 区                 │ · 面板    │
+│ · 快捷目录│   行号│文本…            ▒│       │           │
+│ · 大纲…   │      (覆盖式滚动条、文档地图)   │           │
+├───────────┴──────────────────────────────────┴───────────┤
+│ 底部停靠:输出窗口 / 查找结果 / …                         │
+├──────────────────────────────────────────────────────────┤
+│ 就绪│文件大小│选区│语法│制表符│行│列│字符值│总行数│…    │  状态栏
+└──────────────────────────────────────────────────────────┘</div>
+<p>各部件要点:</p>
+<ul>
+<li><b>标签条</b>:每个打开的文档一个标签;修改过的文档标题后带 <code>*</code> 并有红色状态带。右键标签弹出页签菜单;双击或中键直接关闭。</li>
+<li><b>停靠面板</b>:目录树、快捷目录、文件列表、大纲视图、代码片段、书签管理器在左右两侧;输出窗口、查找结果在底部。页签条可在四边之间移动,详见 <a href="#panels">第 17 章</a>。<kbd>F7</kbd> 一键隐藏/恢复所有面板。</li>
+<li><b>滚动条</b>:覆盖式胶囊滚动条,悬浮于编辑区边缘;滑块下方有修改行标记。淡出后移动文档会再次浮现。</li>
+<li><b>状态栏</b>:字段可自定义(选项 → 状态栏),多数字段可点击,如「行/列」打开跳转、「编码」弹出编码菜单。</li>
+</ul>
+
+<h3 id="five-min">2.4 五分钟上手</h3>
+<ol>
+<li><b>打开一个代码文件</b>。如果没装对应解析器,程序会弹「下载解析器」提示框——选中合适的解析器点「下载并安装」,新打开的文件立即生效着色。</li>
+<li><b>查找</b>:<kbd>Ctrl+F</kbd> 打开右上角查找条,按钮依次为:下一个 ▼、上一个 ▲、正则 <code>.*</code>、大小写 <code>Aa</code>、全字 <code>""</code>、反向 ↺、查找全部 ≡、关闭 ✖。</li>
+<li><b>换主题</b>:「工具」→「设置」→「主题」打开「主题」对话框,可改颜色/几何/字体/形状;「查看」→「深色主题」切换深浅(重启生效)。</li>
+<li><b>多光标</b>:选中一个词按 <kbd>Ctrl+D</kbd> 逐个追加下一处,或 <kbd>Alt+F3</kbd> 选中所有匹配,直接同时编辑。</li>
+<li><b>折叠</b>:装了解析器的文件可语法折叠——<kbd>Ctrl+K</kbd>,<kbd>Ctrl+1</kbd> 折叠全部,<kbd>Ctrl+K</kbd>,<kbd>Ctrl+J</kbd> 展开。</li>
+<li><b>快捷键</b>:「工具」→「设置」→「快捷键」打开快捷键管理器,选中命令后捕获新组合点「分配」,即时生效并写回 <code>key.ini</code>。</li>
+</ol>
+</section>
+
+<!-- ==================== 3 文件操作 ==================== -->
+<section class="chapter" id="files">
+<h2>3 文件操作</h2>
+
+<h3>3.1 新建</h3>
+<p>「文件」→「新建」子菜单,或工具栏「新建」按钮的下拉:</p>
+<table>
+<tr><th>入口</th><th>行为</th><th>快捷键</th></tr>
+<tr><td>普通文本</td><td>新建空白文档,编码/换行符取「选项 → 文件」页的默认值</td><td><kbd>Ctrl+N</kbd></td></tr>
+<tr><td>二进制</td><td>新建十六进制文档,直接以覆写模式编辑字节</td><td>—</td></tr>
+<tr><td>配置模板</td><td>打开「选项」对话框的「模板」页</td><td>—</td></tr>
+<tr><td>模板行(HTML、PHP、Java、Markdown、C/C++ 等)</td><td>按 <code>template.ini</code> 新建文档并展开模板内容,<code>${n:…}</code> 占位成为选区、<code>$0</code> 是最终光标;每次打开菜单都会重新读取 template.ini</td><td>—</td></tr>
+<tr><td>其它文件类型…</td><td>新建后弹出「切换文件类型」对话框挑选语法</td><td>—</td></tr>
+</table>
+<p>模板可自行增删(选项 → 模板页),详见 <a href="#opt-template">23.6 模板页</a>。</p>
+
+<h3>3.2 打开</h3>
+<ul>
+<li><b>打开</b>(<kbd>Ctrl+O</kbd>):系统文件对话框,支持多选。也可以从资源管理器把文件拖进窗口。</li>
+<li><b>打开文件夹内文件</b>:先选目录,再列目录中的文件供挑选。</li>
+<li><b>恢复最后关闭的文件</b>(<kbd>Ctrl+Shift+T</kbd>):按关闭顺序依次恢复。</li>
+<li><b>最近的文件</b>:「文件」→「最近的文件」子菜单,默认记住 16 条(0–64 可调),条目里记着关闭时的行/列,点开后光标回到该处。「清除历史记录」清空列表。</li>
+<li><b>拖放</b>:拖文件 = 逐个打开;拖<b>文件夹</b>到编辑区会弹菜单,可选「添加到快捷目录 / 插入文件路径 / 插入文件夹中的文件列表 / 打开文件夹内的文件」;拖<b>文本</b> = 在落点插入(编辑器内拖动选区则为移动)。</li>
+</ul>
+
+<h3>3.3 保存</h3>
+<table>
+<tr><th>命令</th><th>说明</th><th>快捷键</th></tr>
+<tr><td>保存</td><td>写回原文件,保留源编码与 BOM;文件未被修改时默认不给保存(选项 → 文件页可放开「文件未被修改时也可以保存」)</td><td><kbd>Ctrl+S</kbd></td></tr>
+<tr><td>保存全部</td><td>保存所有被修改的文档</td><td>—</td></tr>
+<tr><td>另存为</td><td>换名保存</td><td><kbd>Ctrl+Shift+S</kbd></td></tr>
+</table>
+<ul>
+<li><b>换行符</b>按文档当前行尾逐行写出;「文档」→「换行符格式」可整体转换。</li>
+<li><b>只读文件</b>的修改处理方式由「选项 → 文件」页决定(蜂鸣 / 修改时提示 / 保存时提示 / 不提示)。</li>
+<li><b>关闭与退出</b>时的保存询问:单个文档弹系统「是/否/取消」;批量关闭(关闭全部/其它/左侧/右侧、退出)弹五按钮对话框:「是 / 全是 / 否 / 全否 / 取消」。</li>
+</ul>
+
+<h3>3.4 重新读取与编码</h3>
+<ul>
+<li><b>重新读取</b>:放弃内存中的修改,从磁盘重读。</li>
+<li><b>指定编码加载</b>:用选定的编码重新解释文件字节(不改文件)。</li>
+<li><b>转换编码</b>:把内容转写到目标编码,保存时生效;支持 BOM 开关。详见 <a href="#encoding">第 14 章</a>。</li>
+</ul>
+
+<h3>3.5 文档信息</h3>
+<ul>
+<li><b>重命名</b>:就地重命名当前文件。</li>
+<li><b>复制路径 / 复制文件名</b>:把当前文档的完整路径或文件名放入剪贴板。</li>
+<li><b>在文件管理器中打开</b>:打开资源管理器并定位该文件。</li>
+<li><b>字符统计</b>(「文档」菜单):统计字符、行、选区信息等;状态栏「选区信息」格点击同样打开。</li>
+<li><b>打印 / 打印预览</b> <span class="badge na">尚未提供</span>:菜单行存在但当前版本不能打印。「选项 → 打印」页可以先配置边距与页眉页脚。</li>
+</ul>
+
+<h3>3.6 会话</h3>
+<p>「文件」→「会话」子菜单可以把当前打开的全部文档存成命名会话:</p>
+<ul>
+<li><b>保存到新会话…</b>:命名并保存(文档清单、类型、编码、换行符、光标)。</li>
+<li><b>保存到当前会话</b>:覆盖保存。</li>
+<li><b>清除会话菜单</b>:删除已保存的会话名单。</li>
+<li>子菜单底部每个已保存会话一行,点击恢复。</li>
+</ul>
+<p>会话文件(<code>*.session</code>)保存在 exe 目录。与「退出时自动恢复」是两回事:后者由「选项 → 会话」页控制,详见 <a href="#safety">第 22 章</a>。</p>
+
+<h3>3.7 备份与历史</h3>
+<p>「文件」→「备份与历史…」打开备份历史对话框:按文件浏览历次备份、恢复、另存。自动备份的规则(间隔、版本数、保留天数、配额)见 <a href="#safety">第 22 章</a>。</p>
+</section>
+
+<!-- ==================== 4 编辑文本 ==================== -->
+<section class="chapter" id="editing">
+<h2>4 编辑文本</h2>
+
+<h3 id="basic-edit">4.1 输入、插入与覆写</h3>
+<ul>
+<li>默认为<b>插入模式</b>;按 <kbd>Ins</kbd> 或点状态栏「编辑模式」格在插入/覆写间切换。</li>
+<li><b>自动缩进</b>:回车后新行继承上一行行首缩进(「文档」菜单可开关)。</li>
+<li><b>自动配对</b>:输入左括号自动补右括号;选项 → 编辑页的「中文括号(必须配对输入)」可指定参与配对的全角字符;「按下Tab时跳出刚刚自动输入的配对字符」默认开启。</li>
+<li><b>光标列号</b>默认从 1 开始计数(选项 → 编辑页可改);「光标列号从1开始计数」影响状态栏与跳转对话框的列号语义。</li>
+<li><b>智能 Home</b>:<kbd>Home</kbd> 移动到「子行头」——先跳过行首空白再回到真正行首;编辑器把折行产生的后半段视为「子行」,所以「移动到子行头/子行尾」在自动换行下行为符合直觉。</li>
+<li><b>光标位置历史</b>:编辑器记住最近 10 个光标停留位置(按段落粒度),<kbd>Ctrl+\</kbd>/<kbd>Ctrl+Shift+\</kbd> 在上一个/下一个位置之间往返;「查找」菜单 →「光标位置」另有编辑位置导航。</li>
+<li><b>交换字符</b>(<kbd>Ctrl+T</kbd>):交换光标左右两侧的字符。</li>
+<li><b>在当前行之后/之前新建行</b>:<kbd>Ctrl+Enter</kbd> / <kbd>Shift+Enter</kbd>,不移动光标位置语义,直接断行。</li>
+</ul>
+
+<h3 id="undo">4.2 撤销与重做</h3>
+<ul>
+<li><kbd>Ctrl+Z</kbd> 撤销、<kbd>Ctrl+Y</kbd> 重做;「已修改」状态按历史位置判定——撤销回保存点文档即恢复「干净」状态(标题的 <code>*</code> 消失)。</li>
+<li>撤销深度默认 <b>1000 步</b>;新编辑会清空重做栈。</li>
+<li><b>宏录制</b>期间的所有编辑作为整体一步(复合撤销);宏暂停期间的编辑逐条入栈。</li>
+<li><b>全部替换</b>的每一处替换是一条独立撤销记录,可以逐处回退。</li>
+</ul>
+
+<h3 id="clipboard">4.3 剪贴板与粘贴</h3>
+<p>除常规 <kbd>Ctrl+X</kbd>/<kbd>Ctrl+C</kbd>/<kbd>Ctrl+V</kbd> 外,「编辑」→「剪贴板」与右键「更多粘贴」提供一组进阶粘贴:</p>
+<table>
+<tr><th>命令</th><th>行为</th></tr>
+<tr><td>剪切并追加 / 复制并追加</td><td>不覆盖剪贴板,把新内容追加到现有内容末尾(<kbd>Ctrl+Shift+C</kbd> 为追加复制)</td></tr>
+<tr><td>剪切标记行 / 复制标记行</td><td>对所有有书签的行整行剪切/复制(按行序拼块)</td></tr>
+<tr><td>列模式粘贴</td><td><kbd>Ctrl+Shift+V</kbd>:把多行内容按列对齐贴到每一行</td></tr>
+<tr><td>行尾列模式粘贴</td><td>同上,但贴到每行的<b>行尾</b>(短行自动补齐到统一列)</td></tr>
+<tr><td>缩进粘贴(保持缩进格式)</td><td>按剪贴块首行的缩进续排,整块相对缩进不变</td></tr>
+<tr><td>从剪贴板历史中粘贴</td><td><kbd>Ctrl+K</kbd>,<kbd>Ctrl+V</kbd>:弹出最近 10 条剪贴板历史,每行显示该条第一行(截 60 字符),选中即粘贴该条</td></tr>
+<tr><td>粘贴 \0 字符</td><td>粘贴 NUL 字符(常规粘贴会在 \0 处截断字符串)</td></tr>
+<tr><td>清空剪贴板</td><td>清空系统剪贴板</td></tr>
+<tr><td>监视剪贴板</td><td>「文档」菜单开关:剪贴板内容一变即自动粘贴到光标处(忽略编辑器自己写入的)</td></tr>
+</table>
+<div class="box note"><b>复制为 RTF</b> <span class="badge na">尚未提供</span><br>「编辑」菜单中的「复制为RTF」一行当前未实现。</div>
+
+<h3 id="delete-ops">4.4 删除</h3>
+<table>
+<tr><th>命令</th><th>快捷键</th></tr>
+<tr><td>删除上一个/下一个字符(或选区)</td><td><kbd>Backspace</kbd> / <kbd>Del</kbd></td></tr>
+<tr><td>向左/向右删除单词</td><td><kbd>Ctrl+Backspace</kbd> / <kbd>Ctrl+Del</kbd></td></tr>
+<tr><td>删除整行</td><td><kbd>Ctrl+L</kbd></td></tr>
+<tr><td>删除到行头 / 行尾</td><td>—</td></tr>
+<tr><td>删除空白行</td><td>—</td></tr>
+<tr><td>删除重复行(从上往下 / 从下往上)</td><td>按行文本去重,保留最先/最后出现的那一份</td></tr>
+<tr><td>删除行头空白 / 行尾空白</td><td>整段选区统一修剪</td></tr>
+</table>
+
+<h3 id="line-ops">4.5 行操作</h3>
+<table>
+<tr><th>命令</th><th>说明</th><th>快捷键</th></tr>
+<tr><td>上移行 / 下移行</td><td>把当前行(或选区行)与相邻行交换</td><td><kbd>Alt+↑</kbd> / <kbd>Alt+↓</kbd></td></tr>
+<tr><td>重复行</td><td>复制一份当前行或选区行</td><td><kbd>Ctrl+J</kbd></td></tr>
+<tr><td>重复选区</td><td>复制选中文本</td><td>—</td></tr>
+<tr><td>复制行</td><td>复制整行(不含行尾符),原选区保持不变</td><td>—</td></tr>
+<tr><td>合并行</td><td>把选区各行(或下一行与当前行)合并为一行</td><td><kbd>Ctrl+Shift+J</kbd></td></tr>
+<tr><td>排序</td><td>升序/降序/高级排序,见 <a href="#sort">20.2</a></td><td><kbd>F9</kbd> / <kbd>Shift+F9</kbd> / <kbd>Ctrl+F9</kbd></td></tr>
+<tr><td>对齐</td><td>选区向左/居中/向右对齐(按选区宽度补空格)</td><td>—</td></tr>
+<tr><td>打散选区到每一行</td><td>选区中每行成为独立选区(多光标)</td><td><kbd>Ctrl+Shift+L</kbd></td></tr>
+<tr><td>恢复最近的选区</td><td>恢复上一次的选区形状</td><td>—</td></tr>
+</table>
+
+<h3 id="convert-ops">4.6 转换</h3>
+<p>「编辑」→「转换」子菜单(右键菜单亦有同名项):</p>
+<ul>
+<li>大小写:转为大写 / 小写 / 反转大小写 / 单词首字母大写(Unicode 规则,如 <code>straße</code> → <code>STRASSE</code>)。</li>
+<li>全角/半角互转:ASCII 可见字符与全角形式互转,空格与全角空格互转,其余字符不动。</li>
+<li>制表符与空格:制表符转为空格 / 空格转为制表符 / 行头制表符转为空格 / 行头空格转为制表符(按当前制表位宽度)。</li>
+</ul>
+
+<h3 id="format-ops">4.7 格式:缩进、注释、对齐</h3>
+<ul>
+<li><b>增加/减少缩进</b>(<kbd>Ctrl+I</kbd> / <kbd>Ctrl+Shift+I</kbd>),<b>格式化缩进</b>:按语言内置规则整理行首空白。</li>
+<li><b>单行注释 / 取消单行注释</b>(<kbd>Ctrl+/</kbd> / <kbd>Ctrl+Shift+/</kbd> 取消多行):注释符按语言表——<code>//</code>、<code>#</code>、<code>--</code>、<code>;</code> 等;行注释按块内最小缩进对齐插入。</li>
+<li><b>多行注释 / 取消多行注释</b>:<code>/* */</code>、<code>&lt;!-- --&gt;</code>、<code>""" """</code>、<code>--[[ ]]</code>、<code>=begin/=end</code> 等按语言配对包裹。</li>
+<li><b>激活选区锚点</b>:挂起一个锚点后移动光标即形成选区,再次执行确认;菜单项在锚点挂起时显示勾选。</li>
+<li><b>部分编辑</b>:把当前选区临时变成独立可编辑区域,其余部分不可改动,适合定点修改。</li>
+<li><b>HEX 模式</b>:「编辑」菜单或工具栏「HEX模式」按钮把当前文本转为十六进制视图,再次执行转回(无默认快捷键),见 <a href="#hex">第 16 章</a>。</li>
+</ul>
+<div class="box note"><b>按键冲突提示</b>
+少数 LSP 按键与全局快捷键同键,默认 <code>key.ini</code> 的绑定优先;详见 <a href="#lsp">第 13 章</a>。</div>
+
+<h3 id="tools-inline">4.8 日期时间、Base64、求和、统计</h3>
+<ul>
+<li><b>日期 / 时间 / 自定义日期/时间</b>:「编辑」→「时间和日期」。<kbd>Ctrl+'</kbd> 插入当前日期。自定义格式用 token:<code>${y}</code> 年、<code>${M2}</code> 两位月、<code>${d2}</code> 两位日、<code>${H2}</code> 24 时、<code>${h2}</code> 12 时、<code>${m2}</code> 分、<code>${s2}</code> 秒、<code>${A}</code> 星期全名、<code>${a}</code> 星期缩写、<code>${p}</code> AM/PM、<code>${j}</code> 年内天、<code>${u}</code> 年内周等;「自定义日期/时间」对话框里下拉选 Date/Time、箭头菜单插入 token、实时预览,确定后写回 <code>[DateTime]</code>。</li>
+<li><b>Base64</b>:「工具」→「Base64」——以 UTF-8 编码/解码、或指定编码编码/解码;解码前自动剔除换行与空白,非法输入原文不动。</li>
+<li><b>选区求和</b>:对选区(或整篇)中的数字求和,结果显示在只读结果框中可复制;整数不带小数点,小数最多 6 位去尾零。</li>
+<li><b>字符统计</b>:字数、行数、选区统计。</li>
+</ul>
+
+<h3 id="typing-aids">4.9 输入辅助</h3>
+<ul>
+<li><b>自动完成</b>:键入词字符后自动弹候选,详见 <a href="#complete">第 12 章</a>。</li>
+<li><b>行头禁排 / 行尾禁排字符</b>(选项 → 编辑页):控制自动换行时标点悬挂,默认值已覆盖常用中文标点(<code>!),.:;?]}!_),.:;?]}、。:;?!)</code> 等)。</li>
+<li><b>强制剪贴板的换行符格式</b>(选项 → 编辑页):粘贴时把剪贴板里的换行统一为指定格式。</li>
+<li><b>选区高亮最大字符数</b>:超过上限的选区不再触发「选中词全文高亮」,默认 64。</li>
+<li><b>颜文字</b>:「查看」→「颜文字」→「显示颜文字」开启彩色字形渲染;「插入颜文字」<span class="badge na">尚未提供</span>。</li>
+<li><b>显示函数提示</b> <span class="badge na">尚未提供</span>。</li>
+</ul>
+</section>
+
+<!-- ==================== 5 选择 ==================== -->
+<section class="chapter" id="selection">
+<h2>5 选择、多光标与列模式</h2>
+
+<h3>5.1 基本选择</h3>
+<table>
+<tr><th>操作</th><th>快捷键</th></tr>
+<tr><td>全选</td><td><kbd>Ctrl+A</kbd></td></tr>
+<tr><td>选择当前单词</td><td><kbd>Alt+W</kbd></td></tr>
+<tr><td>选择整行</td><td>—</td></tr>
+<tr><td>字符级扩展选区</td><td><kbd>Shift+←→↑↓</kbd></td></tr>
+<tr><td>选择到行头/行尾</td><td><kbd>Shift+Home</kbd> / <kbd>Shift+End</kbd></td></tr>
+<tr><td>选择到文档起始/结束</td><td><kbd>Ctrl+Shift+Home</kbd> / <kbd>Ctrl+Shift+End</kbd></td></tr>
+<tr><td>按词扩展选区</td><td><kbd>Ctrl+Shift+←→</kbd></td></tr>
+<tr><td>翻页扩展选区</td><td><kbd>Shift+PageUp</kbd> / <kbd>Shift+PageDown</kbd></td></tr>
+<tr><td>选择到上一行/下一行同列</td><td><kbd>Alt+Shift+↑</kbd> / <kbd>Alt+Shift+↓</kbd></td></tr>
+<tr><td>选择到匹配括号(不含/包含括号本身)</td><td><kbd>Ctrl+Shift+]</kbd> / <kbd>Ctrl+Shift+[</kbd></td></tr>
+</table>
+
+<h3>5.2 多重选区与多光标</h3>
+<p>编辑器的选区是「区间集合」,支持任意多段;每段选区各有一个光标,编辑对所有光标同时生效。</p>
+<table>
+<tr><th>命令</th><th>快捷键</th><th>行为</th></tr>
+<tr><td>快速选择(添加下一处)</td><td><kbd>Ctrl+D</kbd></td><td>以当前选区/光标词为模式,向下追加下一个匹配并进入多点编辑;按 <kbd>Esc</kbd> 退最后一次</td></tr>
+<tr><td>选择所有匹配</td><td><kbd>Alt+F3</kbd></td><td>一次选中文档内全部匹配(大小写与全字规则跟随「查找」选项)</td></tr>
+<tr><td>打散选区到每一行</td><td><kbd>Ctrl+Shift+L</kbd></td><td>每个选区行独立成段</td></tr>
+<tr><td>向上/下/左/右列择</td><td><kbd>Alt+Shift+↑↓←→</kbd></td><td>键盘列选择,逐列扩展</td></tr>
+<tr><td>列模式(开关)</td><td>「编辑」→「列模式」</td><td>锁存开关,影响粘贴与编辑语义</td></tr>
+</table>
+<ul>
+<li><b>鼠标列选择</b>:按住 <kbd>Alt</kbd> 拖拽,产生每行一段选区与每行一个光标;单行范围自动退回普通选区。</li>
+<li><b>查找全部 ≡</b>(查找条):把全部命中转为多重选区,直接多光标编辑。</li>
+<li>多数跳跃类命令(移动行、括号跳转、段落跳转等)会<b>清空多光标</b>,回到单光标。</li>
+<li>状态栏「编辑模式」格会显示 <code>多选</code> 或 <code>列模式</code>。</li>
+</ul>
+
+<h3>5.3 虚拟空格与软空格</h3>
+<ul>
+<li><b>使用虚拟空格</b> <span class="badge na">尚未提供</span>:菜单行存在,当前版本未实现。</li>
+<li><b>使用软空格</b> <span class="badge na">尚未提供</span>:同上(状态栏制表符菜单中的「Soft Tab」亦指向此命令)。</li>
+</ul>
+</section>
+
+<!-- ==================== 6 查找与替换 ==================== -->
+<section class="chapter" id="find">
+<h2>6 查找与替换</h2>
+
+<h3 id="findbar">6.1 查找条</h3>
+<p><kbd>Ctrl+F</kbd>(「查找」)在编辑区右上角弹出查找条;打开时自动预填当前选区或光标处的单词。<kbd>Ctrl+H</kbd> 直接进入替换模式(多一行替换框);查找条第三行可现场转入「在文件中查找」。</p>
+<table>
+<tr><th>按钮</th><th>作用</th></tr>
+<tr><td>▼ / ▲</td><td>查找下一个 / 上一个(<kbd>F3</kbd> / <kbd>Shift+F3</kbd>;查找条获得焦点时 <kbd>Enter</kbd> 为下一个)</td></tr>
+<tr><td><code>.*</code></td><td>切换正则表达式</td></tr>
+<tr><td><code>Aa</code></td><td>切换匹配大小写</td></tr>
+<tr><td><code>""</code></td><td>切换全字匹配</td></tr>
+<tr><td>↺</td><td>切换「向上查找」方向</td></tr>
+<tr><td>≡</td><td>查找全部并列出结果</td></tr>
+<tr><td>✖</td><td>关闭查找条(<kbd>Esc</kbd> 同)</td></tr>
+</table>
+<p>替换行的按钮:<b>替换</b>(替换当前匹配)与<b>全部</b>(替换全部匹配,每处一条撤销)。查找条打开时,<kbd>Ctrl+E</kbd> 替换当前匹配、<kbd>Ctrl+Shift+E</kbd> 替换全部。</p>
+<p>其余入口:「查找下一个单词」<kbd>Ctrl+F3</kbd> /「查找上一个单词」<kbd>Ctrl+Shift+F3</kbd>(以光标处单词为模式,不弹窗);「迷你查找…」<kbd>Ctrl+Alt+F</kbd> 同样是查找条。</p>
+
+<h3 id="findopts">6.2 查找选项与正则</h3>
+<p>四个开关作用于文档内查找:<b>匹配大小写</b>、<b>全字匹配</b>(词字符 = 字母数字与 <code>_</code>)、<b>正则表达式</b>、<b>方向(向上)</b>。行为细节:</p>
+<ul>
+<li><b>循环查找</b>:向后找不到时回绕到文档开头继续(反之亦然);但「快速选择下一处」不回绕。</li>
+<li><b>跨行匹配</b>:查找串本身含 <code>\n</code>/<code>\r</code> 时可跨行命中(如 <code>a\nb</code>);正则模式按行执行。</li>
+<li><b>大小写折叠</b>按 Unicode 字符折叠,不只是 ASCII。</li>
+<li><b>正则引擎</b>为 RE2 风格(Rust regex crate):不支持环视/后行断言,不支持反向引用出现在查找串中。<b>替换串</b>:文档内替换支持 <code>$0</code>–<code>$9</code> 分组引用(其余转义序列按字面写入);「在文件中查找和替换」的替换串另支持 <code>\n</code> 换行、<code>\t</code> 制表符与 <code>$$</code> 表示字面 <code>$</code>(见其替换框的箭头菜单)。</li>
+</ul>
+<div class="box warn"><b>「在文件中查找」正则菜单的预设记号</b>
+查找对话框的箭头菜单列出了常用记号(<code>\n</code> <code>\t</code> <code>^</code> <code>$</code> <code>.</code> <code>\b</code> <code>\w</code> <code>\s</code> <code>\d</code> <code>[]</code> <code>()</code> <code>|</code> <code>{n,m}</code> <code>* + ?</code> 等)与 POSIX 类(<code>[:alpha:]</code> <code>[:digit:]</code> 等),这些与引擎兼容。但其中 <code>(?=exp)</code> <code>(?!exp)</code> <code>(?&lt;=exp)</code> <code>(?&lt;!exp)</code>(环视)与 <code>\c 汉字</code> <code>\j 平假名</code> <code>\J 片假名</code> <code>\P CJK符号和标点</code> 属于界面预设文案,当前引擎不支持——写成这样的模式不会产生任何匹配。</div>
+
+<h3 id="findall">6.3 查找全部</h3>
+<ul>
+<li>「查找」→「查找全部」(<kbd>F6</kbd>,或查找条 ≡):以当前选区或光标处单词为模式,列出全部出现位置。</li>
+<li>菜单版「查找全部」打开一个只读的「查找结果」<b>文档标签</b>(行内带行:列,可点击跳转);查找条 ≡ 则把全部命中转为<b>多重选区</b>。</li>
+<li>结果规模受「选项 → 性能」页「查找全部时,限制每次输出的文本的大小」约束。</li>
+</ul>
+
+<h3 id="quickselect">6.4 快速选择(多光标选取)</h3>
+<p>「查找」→「快速选择」:</p>
+<table>
+<tr><th>命令</th><th>说明</th></tr>
+<tr><td>快速选择 <kbd>Ctrl+D</kbd></td><td>向下追加下一个相同词进入多光标;Esc 退最后一次</td></tr>
+<tr><td>选择所有匹配 <kbd>Alt+F3</kbd></td><td>文档内全部匹配入选</td></tr>
+<tr><td>大小写匹配 <span class="badge na">尚未提供</span></td><td>菜单行存在;大小写开关当前由 <code>[Edit] QuickCase</code> 设置控制选区高亮的行为</td></tr>
+<tr><td>智能匹配单词边界 <span class="badge na">尚未提供</span></td><td>同上,对应 <code>[Edit] QuickSmart</code></td></tr>
+</table>
+
+<h3 id="grepdlg">6.5 在文件中查找和替换</h3>
+<p>「查找」→「在文件中查找和替换…」(<kbd>Ctrl+Shift+F</kbd>)打开无模式对话框:</p>
+<table>
+<tr><th>控件</th><th>说明</th></tr>
+<tr><td>查找 / 替换</td><td>输入框,右侧箭头弹出正则记号菜单(见 6.2 的警告)</td></tr>
+<tr><td>类型</td><td>文件通配,如 <code>*.cpp;*.h</code>;箭头菜单内置 50 余种语言预设(「所有文件(*.*)」「C++」「Python」等)与 <code>DogEdit Mode File(*.esm)</code></td></tr>
+<tr><td>排除</td><td>要排除的文件/目录名模式,分号分隔(如 <code>*.tmp;*.bak</code>);预设含 <code>*.exe;*.dll;*.cab;*.bin</code>、<code>node_modules</code> 等</td></tr>
+<tr><td>文件夹</td><td>目标目录;「…」浏览;眼睛按钮取当前文件路径;⫪ 移到上一级</td></tr>
+<tr><td>匹配大小写 / 全字匹配 / 正则表达式</td><td>同文档内查找;勾选正则后禁用全字匹配</td></tr>
+<tr><td>包含子文件夹</td><td>递归子目录</td></tr>
+<tr><td>查找不匹配的行</td><td>反向:列出<b>不</b>包含模式的行</td></tr>
+<tr><td>仅显示文件路径</td><td>结果只列文件不列行</td></tr>
+<tr><td>使用输出窗口</td><td>结果送输出窗口而不是查找结果面板</td></tr>
+<tr><td>备份被替换的文件</td><td>替换前把每个将被修改的文件做一次备份(默认开)</td></tr>
+<tr><td>锁定主窗口(推荐)</td><td>扫描期间暂时禁用主窗口交互</td></tr>
+<tr><td>编码</td><td>「自动探测」置顶,另有 98 项代码页清单</td></tr>
+</table>
+<p>执行与结果:</p>
+<ul>
+<li><b>查找</b>:后台扫描,结果实时进入底部「查找结果」面板(见 6.6);「查找中」进度窗显示当前文件与行数,点「停止」中止。</li>
+<li><b>替换</b>:先弹确认(未开备份时额外警告);替换支持正则分组引用。</li>
+<li>查找引擎优先调用 PATH 上的 <b>ripgrep</b>(<code>rg --vimgrep</code>),没有 rg 时用内置目录遍历;单次命中上限 100,000 条。</li>
+<li>查找/替换/类型/文件夹/排除各留最近 20 条历史(<code>history.ini</code> 的 <code>[GrepFind]</code> 等节)。</li>
+<li>对话框内:<kbd>Ctrl+F</kbd> 转主窗查找,<kbd>Ctrl+H</kbd>/<kbd>Ctrl+R</kbd> 转替换,<kbd>Ctrl+Shift+Alt+F</kbd> 聚焦查找框。</li>
+</ul>
+<p>「查找」→「批量替换…」 <span class="badge na">尚未提供</span>(工具栏上的「批量替换」按钮同)。</p>
+
+<h3 id="findresult">6.6 查找结果面板</h3>
+<ul>
+<li>底部停靠窗格「查找结果」,两级树:文件头 <code>路径 (N matches)</code>,其下每条命中 <code>行:列: 内容</code>。</li>
+<li><b>双击</b>命中行 → 打开该文件并定位到行:列;文件头仅选中不可跳。</li>
+<li>新结果默认全部展开;有新结果时面板自动弹出。</li>
+<li>「使用输出窗口」勾选时结果改送输出窗口,可用输出窗口的「上一个/下一个结果」按钮逐条跳转。</li>
+</ul>
+</section>
+
+<!-- ==================== 7 跳转与导航 ==================== -->
+<section class="chapter" id="navigate">
+<h2>7 跳转与导航</h2>
+
+<h3>7.1 跳转到行</h3>
+<p><kbd>Ctrl+G</kbd>,或点状态栏「行/列/总行数」格。输入行号(可带列号)跳转。</p>
+
+<h3>7.2 跳转(Goto Anything)</h3>
+<p><kbd>Ctrl+P</kbd>(「查找」→「跳转」→「跳转到文件…」)打开主窗顶部居中的「跳转」对话框:</p>
+<table>
+<tr><th>输入</th><th>行为</th></tr>
+<tr><td>(空)</td><td>列出已打开的文档</td></tr>
+<tr><td>纯数字</td><td>置顶「跳转到行 N」</td></tr>
+<tr><td><code>@符号</code></td><td>当前文档符号(来自语法树大纲或 LSP;无服务器时可退回 ctags),副文本显示行号,回车跳转</td></tr>
+<tr><td>其它文本</td><td>快捷目录与工程内模糊文件名匹配(高亮匹配位置,上限 100 条)</td></tr>
+</table>
+<ul>
+<li>状态行实时显示「正在索引…」「N 个匹配」「Everything 实时:N 个文件」等;装了 <b>Everything</b> 时文件搜索走 Everything 实时查询(可设环境变量 <code>DG_NO_EVERYTHING=1</code> 强制回退内置扫描)。</li>
+<li>「重新索引」按钮强制全量重建目录与符号索引;「关闭」或 <kbd>Esc</kbd> 隐藏(查询文本保留)。</li>
+<li>「跳转到工程符号…」(<kbd>Ctrl+F12</kbd> 预置符号前缀)等价于直接以 <code>@</code> 进入。</li>
+</ul>
+
+<h3>7.3 括号与配对</h3>
+<ul>
+<li><b>括号匹配</b> <kbd>Ctrl+]</kbd>:移动到配对括号;「选择到匹配括号」见第 5 章;「查看」→「括弧高亮」开关配对高亮。</li>
+<li><b>跳转到下一个配对字符</b> <kbd>Ctrl+`</kbd>:在配对符号间往返。</li>
+</ul>
+
+<h3>7.4 位置历史</h3>
+<table>
+<tr><th>命令</th><th>快捷键</th><th>说明</th></tr>
+<tr><td>上一个光标位置 / 下一个光标位置</td><td><kbd>Ctrl+\</kbd> / <kbd>Ctrl+Shift+\</kbd></td><td>光标停留位置环(容量 10,段落粒度)</td></tr>
+<tr><td>上一个编辑位置 / 下一个编辑位置</td><td>—</td><td>「查找」→「光标位置」子菜单</td></tr>
+<tr><td>最近的窗口</td><td><kbd>F12</kbd></td><td>在最近访问的两个文档间切换</td></tr>
+<tr><td>下一个/上一个文档</td><td><kbd>Ctrl+Tab</kbd> / <kbd>Ctrl+Shift+Tab</kbd></td><td>标签顺序切换</td></tr>
+</table>
+</section>
+
+<!-- ==================== 8 书签 ==================== -->
+<section class="chapter" id="bookmark">
+<h2>8 书签、标记与高亮</h2>
+
+<h3>8.1 书签</h3>
+<p>书签挂在<b>行</b>上;编辑(插入/删除行)时自动随行平移。</p>
+<table>
+<tr><th>命令</th><th>快捷键</th></tr>
+<tr><td>切换书签</td><td><kbd>Ctrl+F2</kbd></td></tr>
+<tr><td>下一个书签</td><td><kbd>F2</kbd>(到文末回绕)</td></tr>
+<tr><td>上一个书签</td><td><kbd>Shift+F2</kbd></td></tr>
+<tr><td>删除全部书签</td><td><kbd>Ctrl+Shift+F2</kbd></td></tr>
+<tr><td>书签管理器(面板)</td><td><kbd>Ctrl+K</kbd>,<kbd>B</kbd></td></tr>
+<tr><td>显示书签(边栏标记开关)</td><td>「查找」→「书签」→「显示书签」</td></tr>
+</table>
+<ul>
+<li><b>剪切标记行 / 复制标记行</b>:对所有书签行整行剪切/复制。</li>
+<li><b>书签管理器</b>面板:按文档分组列出书签(组头 <code>文件名 (书签数)</code>,条目 <code>行号: 行文本</code>),双击条目跳到该文档该行。</li>
+<li>没有编号书签;「使用标记 1–8」属于<b>自定义标记</b>(下一节)。</li>
+</ul>
+
+<h3>8.2 自定义标记</h3>
+<p>「查看」→「自定义标记」或右键「自定义标记」打开管理对话框:8 个标记槽位,每个条目可设置<b>自己的文本、颜色、匹配选项(大小写/全字/正则)</b>与启用勾选;按钮含「添加 / 删除 / 重命名 / ☑ 全勾 / ☐ 全不勾 / ↑ / ↓ / 应用」。右键菜单「使用标记1…使用标记8」把当前选区文本一键存入对应槽位并染色。「开关自定义标记」整体启停。</p>
+<p>标记命中处用主题标记色绘制,是常驻的视觉锚点,与查找高亮互不影响。</p>
+
+<h3>8.3 选区与词高亮</h3>
+<ul>
+<li><b>选区高亮</b>(「查看」菜单开关):选中的词在全文中同色高亮,默认<b>大小写敏感</b>(<code>[Edit] QuickCase</code>)、可开全字门(<code>[Edit] QuickSmart</code>),超过 64 字符的选区不高亮(<code>[Edit] MaxSelHighlight</code>,1–1024)。</li>
+<li><b>高亮网址和邮件</b>:URL 与邮箱下划线着色,可点击打开。</li>
+<li><b>颜色高亮</b>:形如 <code>#RRGGBB</code> 的颜色文本按该颜色着色预览。</li>
+<li><b>括弧高亮</b>:配对括号成对高亮。</li>
+</ul>
+
+<h3>8.4 图标提示</h3>
+<p>「查找」→「图标提示」:「下一个提示」/「上一个提示」在边栏图标提示之间跳转,「清除所有提示」一键清除。图标提示由 LSP 诊断等机制投放(如行侧的错误/警告图标)。</p>
+</section>
+
+<!-- ==================== 9 折叠 ==================== -->
+<section class="chapter" id="fold">
+<h2>9 代码折叠</h2>
+
+<h3>9.1 折叠方式</h3>
+<p>「查看」→「代码折叠」(或右键「代码折叠」):</p>
+<table>
+<tr><th>方式</th><th>说明</th></tr>
+<tr><td>取消折叠</td><td>关闭折叠,行号还原</td></tr>
+<tr><td>语法折叠</td><td>默认;基于语法解析器的折叠区间(tree-sitter folds 查询),按代码块语义折叠</td></tr>
+<tr><td>缩进折叠</td><td>按行首缩进推导层级,不依赖语法(空行不参与判断)</td></tr>
+</table>
+
+<h3>9.2 折叠操作</h3>
+<table>
+<tr><th>命令</th><th>快捷键</th></tr>
+<tr><td>折叠当前级别</td><td><kbd>Ctrl+K</kbd>,<kbd>Ctrl+[</kbd></td></tr>
+<tr><td>展开当前级别</td><td><kbd>Ctrl+K</kbd>,<kbd>Ctrl+]</kbd></td></tr>
+<tr><td>折叠全部(第一层)</td><td><kbd>Ctrl+K</kbd>,<kbd>Ctrl+1</kbd></td></tr>
+<tr><td>展开全部</td><td><kbd>Ctrl+K</kbd>,<kbd>Ctrl+J</kbd></td></tr>
+<tr><td>折叠级别 2–9</td><td><kbd>Ctrl+K</kbd>,<kbd>Ctrl+2</kbd> … <kbd>Ctrl+K</kbd>,<kbd>Ctrl+9</kbd></td></tr>
+</table>
+<p>折叠级别 N 折叠所有「嵌套深度 ≥ N」的块。折叠后行号列显示「可见行号 − 上方隐藏行数」的连续编号;行号沟的折叠标记样式可在「选项 → 样式」页选择(简洁/矩形/箭头/矩形和线条/五边形/圆形图标)。</p>
+<div class="box note"><b>依赖与限制</b><br>
+语法折叠需要文件装了带 folds 查询的解析器包;大文件模式(第 15 章)不提供折叠;缩进折叠永远可用。「折叠尾部字符」(显示开关)控制折叠行尾的 <code>…</code> 指示。</div>
+</section>
+
+<!-- ==================== 10 换行与文档模式 ==================== -->
+<section class="chapter" id="wrap">
+<h2>10 自动换行与文档模式</h2>
+
+<h3>10.1 自动换行</h3>
+<p>「文档」→「自动换行」六选一(工具栏「自动换行」下拉同;工具栏按钮本体点击 = 在「取消换行/智能换行」间切换):</p>
+<table>
+<tr><th>模式</th><th>行为</th></tr>
+<tr><td>取消换行</td><td>不换行,长行横向滚动</td></tr>
+<tr><td>智能换行</td><td>按标点与禁排字符智能断行,默认模式</td></tr>
+<tr><td>窗口边界处换行</td><td>按编辑区宽度换行</td></tr>
+<tr><td>指定列换行</td><td>按固定列宽换行</td></tr>
+<tr><td>指定列换行并扩展制表符</td><td>同上,且把制表符展开为空格参与计量</td></tr>
+<tr><td>指定屏幕宽度换行</td><td>按屏幕像素宽度换行</td></tr>
+</table>
+<ul>
+<li><b>换行时缩进子行</b>:折行产生的续行继承行首缩进。</li>
+<li><b>列选之后恢复自动换行</b>:列选择操作临时取消换行后自动恢复。</li>
+<li>超长行保护:「选项 → 性能」页「当文件行数小于?时自动换行」限制自动换行的适用行数。</li>
+</ul>
+
+<h3>10.2 换行符格式</h3>
+<p>「文档」→「换行符格式」:PC (CR+LF) / Unix (LF) / Mac (CR),按当前文档勾选;选择即改写全部行尾(状态栏「换行符类型」格点击亦可)。混合行尾的文档会保留各行原有行尾,直到统一转换。</p>
+
+<h3>10.3 文档模式</h3>
+<table>
+<tr><th>模式</th><th>说明</th></tr>
+<tr><td>禁止编辑</td><td>整篇只读,可选中复制</td></tr>
+<tr><td>阅览模式 <kbd>Ctrl+K</kbd>,<kbd>R</kbd></td><td>进入全屏并以阅览模式查看,禁止编辑;<kbd>Esc</kbd> 退出全屏</td></tr>
+<tr><td>写作模式 <kbd>Ctrl+K</kbd>,<kbd>F</kbd></td><td>进入全屏并写作,适合沉浸码字</td></tr>
+<tr><td>竖排书写模式 <span class="badge na">尚未提供</span></td><td>菜单行存在,未实现</td></tr>
+</table>
+
+<h3>10.4 自动化开关</h3>
+<ul>
+<li><b>自动缩进</b>:回车继承缩进(默认开)。</li>
+<li><b>自动配对</b>:括号配对输入(默认开)。</li>
+<li><b>自动完成</b>:词补全(默认开)。</li>
+<li><b>自动纠正关键字大小写</b> <span class="badge na">尚未提供</span>。</li>
+<li><b>监视该文件变更</b>子菜单 <span class="badge na">尚未提供</span>(五个子项均灰):全局「监视文件变化」选项(选项 → 文件页)仍可用,外部改动后按 <code>[Setting] ReloadMethod</code> 处理。</li>
+</ul>
+</section>
+
+<!-- ==================== 11 语法 ==================== -->
+<section class="chapter" id="syntax">
+<h2>11 语法高亮、文件类型与解析器</h2>
+<p class="lead">DogEdit 的语法着色基于 tree-sitter;二进制里<b>不内置任何语法</b>,高亮与折叠能力全部来自 <code>parsers\</code> 下的解析器插件包。没有解析器的文件仍可编辑,只是没有语法着色与语义折叠。</p>
+
+<h3 id="changetype">11.1 切换文件类型</h3>
+<p>「文档」→「切换文件类型…」,或点状态栏「语法着色类型」格。对话框列出全部可用的语法(首项「默认」= 摘掉语法),选「确定」把当前文档挂到该语法;「配置」按钮转到「语法着色」管理对话框。双击即确认。</p>
+<p>文件类型的自动判定顺序:解析器包声明的 <code>extensions</code>(扩展名冲突时按<b>包名字典序</b>先到先得)→ <code>filenames</code> 精确文件名(如 Dockerfile)→ <code>first_lines</code> 首行嗅探(如 shebang)。几个常见扩展名即使没装包也有内置名字映射(<code>rs→rust</code>、<code>py→python</code>、<code>json→json</code> 等,但没有着色)。</p>
+
+<h3 id="parserpkg">11.2 解析器包</h3>
+<p>一个解析器包 = 一个目录:</p>
+<pre><code>parsers\
+└─ lua\
+   ├─ manifest.toml      包清单(必须)
+   ├─ lua.dll            tree-sitter 语法 DLL(必须)
+   └─ queries\
+      ├─ highlights.scm  高亮查询(capture 名对应主题里的颜色键)
+      └─ folds.scm       折叠查询</code></pre>
+<p><code>manifest.toml</code> 的全部键:</p>
+<table>
+<tr><th>键</th><th>必填</th><th>说明</th></tr>
+<tr><td><code>name</code></td><td>是</td><td>包名,<code>a-z 0-9 _ -</code>,<b>必须与目录名一致</b></td></tr>
+<tr><td><code>display</code></td><td>否</td><td>显示名(状态栏/列表),缺省用 name</td></tr>
+<tr><td><code>version</code></td><td>否</td><td>缺省 "0.0.0"</td></tr>
+<tr><td><code>entry</code></td><td>否</td><td>DLL 导出符号名,缺省 <code>tree_sitter_{name}</code>(<code>-</code> 映射 <code>_</code>)</td></tr>
+<tr><td><code>dll</code></td><td>否</td><td>DLL 文件名,缺省 <code>{name}.dll</code>,不允许路径分隔符</td></tr>
+<tr><td><code>extensions</code></td><td>否</td><td>自动映射的扩展名(小写、无点、去重)</td></tr>
+<tr><td><code>filenames</code></td><td>否</td><td>精确文件名匹配(如 Dockerfile),大小写不敏感</td></tr>
+<tr><td><code>first_lines</code></td><td>否</td><td>首行前缀嗅探(如 <code>#!/usr/bin/env lua</code>),大小写敏感</td></tr>
+<tr><td><code>abi</code></td><td>否</td><td>兼容的 tree-sitter ABI 区间(含端点),如 <code>[13, 15]</code></td></tr>
+<tr><td><code>max_file_bytes</code></td><td>否</td><td>超过此字节数的文件不附加本语法</td></tr>
+</table>
+<div class="box warn"><b>[theme] 已废弃</b><br>
+manifest 里写 <code>[theme]</code> 段会直接报错:配色请写 <code>queries/highlights.scm</code>,capture 名对应的颜色在<b>主题文件</b>里(见 19.1)。</div>
+<p>解析器搜索根(固定三处,不可配置):exe 目录 <code>parsers\</code> → 工作目录 <code>parsers\</code> → <code>%APPDATA%\dogedit\parsers</code>。停用名单写 <code>setting.ini</code> 的 <code>[Syntax] Disabled=包名,包名</code>。</p>
+
+<h3 id="parsermarket">11.3 解析器下载</h3>
+<p>「工具」→「设置」→「解析器下载…」打开管理对话框:</p>
+<ul>
+<li><b>筛选</b>框实时过滤(名称/显示名/扩展名);<b>刷新</b>重新拉取列表(支持 ETag 缓存)。</li>
+<li>列表列:「名称 / 显示名 / 扩展名 / 版本 / 大小 / 状态」,状态有「未安装 / 已装 v* / 有更新 → v* / 已装(本地)」。</li>
+<li><b>下载/更新</b>:下载 zip,经三道校验(sha256 对注册表声明、zip 内路径防穿越、解包体积上限),装到 <code>%APPDATA%\dogedit\parsers</code>,<b>新打开的文件立即生效</b>。</li>
+<li><b>卸载</b>:仅对用户目录下的本地包可用。</li>
+<li><b>从文件安装…</b>:选一个解析器包 zip 离线安装(不做 sha256 校验,信任本地文件)。</li>
+<li>双击行 = 下载/更新。</li>
+</ul>
+<p><b>首开提醒</b>:打开没有解析器的文件时自动弹「下载解析器」框,列出支持该类型的候选;「不再询问」把该扩展名记入 <code>[Download] Dismissed</code>。</p>
+<p><b>离线安装</b>(三选一):</p>
+<ol>
+<li>「从文件安装…」直接装 zip。</li>
+<li>本地镜像:<code>setting.ini</code> 写 <code>[Download] Registry=D:\mirror</code>,目录里放 <code>registry.json</code> 与 <code>pkg\包名\版本.zip</code>,此后全部零网络。</li>
+<li>手工铺目录:把包目录整个拷进三处搜索根之一,再「重新扫描解析器」。</li>
+</ol>
+<p>「查看」→「高级」(「文档」→「高级」)→「重新扫描解析器」把包清单与诊断写进输出窗格。</p>
+
+<h3 id="syntaxdlg">11.4 语法着色(包管理)</h3>
+<p>「工具」→「设置」→「语法着色…」打开「语法着色」对话框:</p>
+<ul>
+<li>摘要行:<code>共 N 个解析器包,已启用 M 个。取消勾选的包不再被新打开的文件使用。</code></li>
+<li>带勾选框的列表,列「语言 / 显示名 / 扩展名 / 状态(未加载/已加载/加载失败)/ query」。</li>
+<li>「全选 / 全不选 / 在线获取...(转解析器下载)/ 确定 / 取消」;诊断行显示包级错误。</li>
+<li>确定后未勾选的包写入 <code>[Syntax] Disabled</code>。</li>
+</ul>
+
+<h3 id="syntaxlimits">11.5 注意事项</h3>
+<ul>
+<li>DLL <b>惰性加载、永不卸载</b>:升级或更换语法 DLL 后需重启;停用包只是「不再被解析到」。</li>
+<li>只有 <b>UTF-8</b> 文档在后台线程解析;其它编码在窗口内同步解析。</li>
+<li>highlights/folds 查询编译失败时退回按节点类型着色,错误在「重新扫描解析器」的报告里。</li>
+<li>大文件模式(第 15 章)不加载语法,改用行式词法器(仅对少数日志/数据扩展名)。</li>
+<li>修改已装包的折叠行为:编辑该包目录里的 <code>queries\folds.scm</code>。</li>
+</ul>
+</section>
+
+<!-- ==================== 12 补全与片段 ==================== -->
+<section class="chapter" id="complete">
+<h2>12 自动完成与代码片段</h2>
+
+<h3>12.1 词自动完成</h3>
+<ul>
+<li><b>触发</b>:键入 ≥2 个词字符后约 150ms 自动弹候选;「查看」→「显示自动完成候选词」手动触发(并入 LSP 候选)。「文档」→「自动完成」总开关。</li>
+<li><b>来源</b>:当前文档单词(标记 <code>-</code>)+ LSP 补全(标记 <code>L</code>,仅手动触发时)。「选项 → 自动完成」页的来源清单(@ 代码片段 / 上下文单词 / 关键字 / 工程符号 / 文件名称)与「已选择」序号控制启用面。</li>
+<li><b>匹配方法</b>:默认(前缀)/ 部分匹配(包含)/ 模糊匹配(子序列,不区分大小写),见「选项 → 自动完成」页。</li>
+<li><b>键盘</b>:↑↓ 选择,<kbd>Tab</kbd> 或「触发按键」选项(回车/空格/制表符/Esc)确认;<kbd>Alt+1…9</kbd> 直接选候选(可用「使用数字键1~9选择候选词」改为 1–9)。<kbd>Esc</kbd> 关闭。</li>
+<li><b>上下文限制</b>:扫描光标上下 ±5000 行(≤10000 行的文档全读)、候选上限 30、每行只看前 1024 字符;有选区时不弹;大文件模式不弹。</li>
+</ul>
+
+<h3>12.2 代码片段</h3>
+<ul>
+<li>内置片段按扩展名索引(c/h、py、js、html、css、java、lua、bat、ahk、pl、php、vbs、rb、nsi 等),输入触发词后按确认键展开。</li>
+<li>片段语法:<code>${1:占位}</code> 带序号占位(展开后成为选区,继续 <kbd>Tab</kbd> 跳到下一处)、<code>$0</code> 最终光标位置、<code>$SELECTION</code> 接住选区。</li>
+<li>「停靠窗格」→「代码片段」面板按当前文档语言列出片段(<code>标题 (触发词)</code>),双击或回车在光标处展开。</li>
+<li>新建文件模板与片段共用同一套展开引擎(见 3.1)。</li>
+</ul>
+</section>
+
+<!-- ==================== 13 LSP ==================== -->
+<section class="chapter" id="lsp">
+<h2>13 LSP 语言服务</h2>
+<p class="lead">DogEdit 内置 LSP 客户端,与 PATH 上的语言服务器对接。当前版本的服务器列表是<b>固定的</b>:只对语法键为 <code>rs</code>(rust)与 <code>json</code>(json)的文档起服务,服务器命令为 <code>rust-analyzer</code>(要求已在 PATH 上);没有按语言自定义服务器命令的配置项。</p>
+
+<h3>13.1 支持的功能</h3>
+<table>
+<tr><th>功能</th><th>触发</th><th>说明</th></tr>
+<tr><td>补全</td><td><kbd>Ctrl+Space</kbd></td><td>手动触发,取 label,上限 12 条;增量同步编辑内容到服务器</td></tr>
+<tr><td>跳转定义</td><td><kbd>F12</kbd></td><td>同文件移动光标,跨文件直接打开目标</td></tr>
+<tr><td>悬停</td><td><kbd>Ctrl+Shift+H</kbd></td><td>光标下方悬浮提示,数秒后自动关闭</td></tr>
+<tr><td>签名帮助</td><td><kbd>Ctrl+Shift+Space</kbd>,或键入 <code>(</code> / <code>,</code> 自动触发</td><td>↑↓ 切换签名,<kbd>Esc</kbd> 关闭,<kbd>Tab</kbd> 关闭并继续片段展开</td></tr>
+<tr><td>文档符号</td><td>大纲面板、「跳转」的 @ 模式</td><td>无服务器时回落到语法树/ctags</td></tr>
+<tr><td>诊断</td><td>自动</td><td>行侧图标(错误/警告/信息)+ 悬停文字「错误: …」等</td></tr>
+<tr><td>重命名</td><td>内置 F7 处理 <span class="badge na">无默认键位</span></td><td>F7 默认已被「显示/隐藏所有面板」占用,重命名入口默认不可达</td></tr>
+<tr><td>查找引用</td><td>内置 Ctrl+R 处理 <span class="badge na">无默认键位</span></td><td>Ctrl+R 默认被「替换」占用,引用入口默认不可达</td></tr>
+</table>
+<div class="box note"><b>快捷键优先级</b><br>
+<code>key.ini</code> 的绑定优先于内置按键。上表中「无默认键位」的两项是内置按键处理,但对应按键已被默认 <code>key.ini</code> 占用,所以开箱即用时它们不生效;把相应按键从 <code>key.ini</code> 移除后,内置的 LSP 处理才会接管。</div>
+
+<h3>13.2 配置与限制</h3>
+<ul>
+<li>开关:<code>setting.ini</code> <code>[Lsp] Enable=N</code> 完全停用;缺省启用。</li>
+<li>要求 <code>rust-analyzer</code> 在 PATH 上;握手在工作线程等待最多 10 秒,请求超时 5 秒。</li>
+<li>重命名只应用<b>当前文件</b>内的编辑;不支持 LSP 格式化、不支持服务器发起的工作区编辑。</li>
+<li>大文件模式一律不起语言服务。</li>
+</ul>
+</section>
+
+<!-- ==================== 14 编码 ==================== -->
+<section class="chapter" id="encoding">
+<h2>14 编码、BOM 与换行符</h2>
+
+<h3>14.1 编码自动识别</h3>
+<p>打开文件时按以下顺序判定编码:</p>
+<ol>
+<li><b>BOM 优先</b>:UTF-8 / UTF-16LE / UTF-16BE / UTF-32 的字节序标记。</li>
+<li>无 BOM 的 UTF-16:NUL 位模式启发。</li>
+<li><b>严格 UTF-8 校验</b>:能完整通过校验就按 UTF-8。</li>
+<li><b>统计探测</b>(chardetng):GBK、Shift-JIS、Windows-1252 等。</li>
+</ol>
+<p>「选项 → 文件」页的「编码探测」开关控制 ANSI→UTF-8 的自动转换行为;「自动编码探测缓存大小(KB)」(性能页)控制探测缓冲。</p>
+
+<h3>14.2 「编码」对话框</h3>
+<p>「文档」→「转换编码」打开「编码」对话框,也可从状态栏「文件编码」格进入:</p>
+<ul>
+<li><b>左侧</b>:收藏列表(默认 9 项:ANSI、UTF-8、UTF-16、UTF-16 BE、GB2312、Big5、Shift-JIS、Korean、Western European),可「添加/移除/上移/下移」,双击即确认。</li>
+<li><b>右侧</b>:全部 98 项代码页——ANSI、UTF-8、UTF-8+BOM、UTF-16 LE/BE、GB2312/GBK/GB18030、Big5、Shift-JIS/EUC-JP/JIS 系、EUC-KR、各 iso-8859-x、Windows-125x、KOI8、Mac 系、DOS 系、EBCDIC、ISCII 等;代码页号 &gt; 10 的显示 <code>名称 [代码页]</code>。</li>
+<li>确定时的选择即目标编码;收藏顺序写回 <code>[Encoding]</code> 节。</li>
+</ul>
+<div class="box note"><b>「指定编码加载」与「转换编码」的区别</b><br>
+「指定编码加载」(<code>[Setting]</code> 之外无开关):按选定编码重新解释文件字节,用于打开乱码文件,不修改文件。<br>
+「转换编码」:把内容转写到目标编码,需要保存才落盘;UTF-16 页保存时带 BOM。</div>
+<p>个别老代码页(UTF-7、EBCDIC、ISCII、DOS 中文、HZ 等)在内部转换层与系统 API 之间有差异,极少数页可能不可用——列表里能选,保存时以实际转换结果为准。</p>
+
+<h3>14.3 BOM 与新文件默认值</h3>
+<ul>
+<li>状态栏「文件编码」格点击弹菜单:「指定编码加载 / 转换编码 / —— / 文件头(BOM)」;「文件头(BOM)」是勾选型开关,直接切换当前文档的 BOM。</li>
+<li>新文档默认格式(选项 → 文件页):换行符默认 CRLF (PC),编码默认 ANSI;默认编码可设 UTF-8 / UTF-8+BOM / UTF-16 LE/BE / GBK / Shift-JIS 等。</li>
+<li>保存时若来源带 BOM,会按 BOM 标志补回,不会悄悄丢失。</li>
+</ul>
+
+<h3>14.4 批量转码</h3>
+<p>「文档」→「批量转码・换行符…」 <span class="badge na">尚未提供</span>:菜单行存在,未实现。批量需求可用「在文件中查找和替换」之外的脚本途径,或逐个文档处理。</p>
+</section>
+
+<!-- ==================== 15 大文件 ==================== -->
+<section class="chapter" id="large">
+<h2>15 超大文件模式</h2>
+<p class="lead">文件达到 <b>50 MB</b>(内置阈值)时,打开动作自动路由到大文件后端:文件<b>永不整体载入内存</b>,按需读取,内存占用约为每行 4 字节的行索引加一个小文本缓存。</p>
+
+<h3>15.1 打开与索引</h3>
+<ul>
+<li>≤8 MB 的内容区同步建全索引,秒开;更大的文件先建首屏 1 MB 与文末 2 MB(保证 <kbd>Ctrl+End</kbd> 立即可用),中间由后台线程补扫,完成后行号转为精确值。</li>
+<li>外部改写被监测到时会提示重载(旋转/截断检测)。</li>
+</ul>
+
+<h3>15.2 编辑与保存</h3>
+<ul>
+<li>编辑在覆盖层上进行,总预算 256 MB;单次删除/替换超过 8M 字符会被拒绝。</li>
+<li>保存 = 原子替换 + 重开并恢复光标。</li>
+<li>自动备份对大文件不生效(见 22.1)。</li>
+</ul>
+
+<h3>15.3 功能差异</h3>
+<table>
+<tr><th>能力</th><th>大文件模式</th></tr>
+<tr><td>语法着色</td><td>tree-sitter 关闭;仅对 <code>log/txt/out/trace</code>、<code>jsonl/ndjson</code>、<code>csv/tsv</code> 用行式词法器着色,单行超 2 万字符整行纯色</td></tr>
+<tr><td>折叠 / 自动换行</td><td>不可用(行号 = 显示行,恒等索引)</td></tr>
+<tr><td>LSP / 自动完成 / 括号配对高亮</td><td>不可用</td></tr>
+<tr><td>查找</td><td>流式查找可用(优化的字节路径);查找条「全部替换」不可用</td></tr>
+<tr><td>查找栏其余功能</td><td>可用</td></tr>
+</table>
+
+<h3>15.4 大文件专属命令</h3>
+<p>大文件文档的右键菜单追加一组:</p>
+<table>
+<tr><th>命令</th><th>行为</th></tr>
+<tr><td>导出选区…</td><td>把选区流式写出到新文件</td></tr>
+<tr><td>替换结果导出…</td><td>流式应用「查找/替换对」到新文件,状态栏报告「已替换 N 处,导出 X MB」——大文件替代「全部替换」的方式</td></tr>
+<tr><td>转为普通模式</td><td>物化成常规文档,恢复语法着色(注意内存)</td></tr>
+<tr><td>尾随日志</td><td>文件增长时自动追加并滚底,适合看滚动日志</td></tr>
+</table>
+</section>
+
+<!-- ==================== 16 HEX ==================== -->
+<section class="chapter" id="hex">
+<h2>16 十六进制视图</h2>
+
+<h3>16.1 进入方式</h3>
+<ul>
+<li>「文件」→「新建」→「二进制」新建十六进制文档。</li>
+<li>打开扩展名命中 <code>[HEX] Ext</code>(默认 <code>dat;exe;bin;dll;hex;zip;rar</code>,选项 → 二进制页可改)的文件自动进十六进制视图。</li>
+<li>「编辑」→「HEX模式」:把当前文本文档转为十六进制查看,再次执行转回(工具栏按钮同)。</li>
+</ul>
+
+<h3>16.2 界面与显示</h3>
+<ul>
+<li>每行 16 字节,字节默认按 2 分组;三列:<b>地址</b>、<b>十六进制数据</b>、<b>ASCII</b>。</li>
+<li>显示开关(视图状态,可组合):十进制地址、段地址、地址冒号、大写十六进制、分组对齐行宽、自动适配宽度、分隔符;地址列与 ASCII 列可隐藏;分组宽度 1–31 字节。</li>
+<li>状态栏切换为 HEX 五格:「就绪 / 选区: N / 偏移: %08X / 大小: N / 插入或覆写」。</li>
+<li>修改过的字节高亮显示;十六进制视图有独立的撤销/重做,编辑成组并带组范围高亮。</li>
+</ul>
+
+<h3>16.3 编辑</h3>
+<table>
+<tr><th>模式</th><th>行为</th></tr>
+<tr><td>只读</td><td>不可编辑;只读属性文件强制只读</td></tr>
+<tr><td>插入</td><td>插入新字节,后续内容后移</td></tr>
+<tr><td>覆写(默认)</td><td>就地改写光标处字节</td></tr>
+</table>
+<ul>
+<li><b>四种进制直接输入</b>:十六进制(2 位)/ 十进制(3 位)/ 八进制(3 位)/ 二进制(8 位)——按键逐位组合出字节,超出按截断处理;ASCII 列直接改字节。</li>
+<li>状态栏「编辑模式」格切换插入/覆写。</li>
+<li>保存 = 写临时文件 → 原子替换 → 重新加载。</li>
+<li>小于 10 MB 的文件全量驻留内存,更大的分页读取。</li>
+</ul>
+<div class="box note"><b>当前版本没有</b><br>
+十六进制视图暂无跳转到偏移、无字节搜索;需要定位时用文本侧查找或外部工具。</div>
+</section>
+
+<!-- ==================== 17 停靠面板 ==================== -->
+<section class="chapter" id="panels">
+<h2>17 停靠面板</h2>
+<p class="lead">「停靠窗格」菜单(「查看」菜单)列出全部面板;每条边各有一个停靠宿主,面板是宿主里的页签。</p>
+
+<h3>17.1 停靠系统</h3>
+<table>
+<tr><th>面板</th><th>切换命令</th><th>默认位置</th></tr>
+<tr><td>目录树</td><td><kbd>Ctrl+K</kbd>,<kbd>M</kbd></td><td>左</td></tr>
+<tr><td>快捷目录</td><td><kbd>Ctrl+K</kbd>,<kbd>D</kbd> 或 <kbd>Ctrl+Shift+D</kbd></td><td>左</td></tr>
+<tr><td>文件列表</td><td><kbd>Ctrl+K</kbd>,<kbd>O</kbd></td><td>左</td></tr>
+<tr><td>大纲视图</td><td><kbd>Ctrl+K</kbd>,<kbd>U</kbd></td><td>左</td></tr>
+<tr><td>代码片段</td><td><kbd>Ctrl+K</kbd>,<kbd>S</kbd></td><td>左</td></tr>
+<tr><td>书签管理器</td><td><kbd>Ctrl+K</kbd>,<kbd>B</kbd></td><td>左</td></tr>
+<tr><td>查找结果</td><td>无(搜索后自动弹出)</td><td>下</td></tr>
+<tr><td>输出窗口</td><td>「输出窗口」,可多开</td><td>下</td></tr>
+</table>
+<ul>
+<li><b>显示/隐藏所有面板</b>(<kbd>F7</kbd>):全部隐藏;再按一次精确还原刚才那组。</li>
+<li><b>页签条</b>:单击切换面板;<b>双击页签 = 关闭</b>该面板;右键弹页眉菜单:<b>移除面板 / —— / 左侧 / 右侧 / 顶部 / 底部 / —— / 上&lt;-&gt;下</b>(所有宿主的页签条整体翻到上/下边)。</li>
+<li>页签条右端有 ✕ 关闭盒,关闭当前面板;面板被关闭后再打开会回到原来的边。</li>
+<li><b>宽度调整</b>:宿主与编辑区之间的分割带可拖;左侧最小 120px,编辑区最小 240×80。没有自动隐藏(auto-hide)机制。</li>
+<li>「命令窗口」「收藏夹」两行 <span class="badge na">尚未提供</span>。</li>
+</ul>
+
+<h3>17.2 目录树与快捷目录</h3>
+<ul>
+<li>「目录树」(<kbd>Ctrl+K</kbd>,<kbd>M</kbd>)是真正的文件系统树,「快捷目录」(<kbd>Ctrl+K</kbd>,<kbd>D</kbd>)是常用目录的扁平清单,两者共用一套右键菜单:</li>
+</ul>
+<table>
+<tr><th>菜单项</th><th>行为</th></tr>
+<tr><td>Open</td><td>打开文件;目录则展开</td></tr>
+<tr><td>New File... / New Folder...</td><td>在选中目录下新建(内联命名)</td></tr>
+<tr><td>添加文件夹</td><td>系统选目录框,加入快捷目录清单</td></tr>
+<tr><td>Remove from List</td><td>从快捷目录清单移除所选根(仅快捷目录可用)</td></tr>
+<tr><td>Rename... / Delete</td><td>重命名(内联编辑框)/ 删除</td></tr>
+<tr><td>Open With...</td><td>用系统关联方式打开</td></tr>
+<tr><td>Expand All / Collapse All</td><td>全部展开/收起</td></tr>
+</table>
+<ul>
+<li>树获得焦点时按 <kbd>Ctrl+F</kbd> 呼出<b>模糊过滤</b>框(<kbd>Esc</kbd> 在空框时收起)。</li>
+<li>拖文件/文件夹到目录树:文件夹加入快捷目录、文件打开。</li>
+<li>最近目录记忆在 <code>[FolderView] Last/DirView</code>。</li>
+</ul>
+
+<h3>17.3 文件列表</h3>
+<p>「文件列表」按标签顺序列出打开的文档(图标 + 文件名),单击切换文档;支持 ↑↓/PageUp/PageDown/Home/End 键盘导航。</p>
+
+<h3>17.4 大纲视图</h3>
+<ul>
+<li>列出当前文档的符号树,层级按缩进推导(最多 8 级),全部默认展开,上限 2000 行(超出显示「…」)。</li>
+<li>符号来源优先级:LSP 文档符号 → 语法树/ctags(「跳转」@ 模式同一套符号)。</li>
+<li>双击或 <kbd>Enter</kbd> 跳到符号所在行。</li>
+</ul>
+
+<h3>17.5 书签管理器</h3>
+<p>跨文档书签总览:按文档分组,组头 <code>文件名 (书签数)</code>,条目 <code>行号: 行文本</code>;双击跳转。书签本身由 <kbd>Ctrl+F2</kbd> 等命令产生(见 8.1),面板不增删。</p>
+
+<h3>17.6 输出窗口</h3>
+<ul>
+<li>外部工具的输出与各处报告落到输出窗口;「新建输出窗口」可开多个窗格(标题「输出窗口1」「输出窗口2」…)。</li>
+<li>顶部工具条:「上一个结果 / 下一个结果 | 终结 / 清除 | 展开全部 / 折叠全部 | 自动换行 / 新建输出窗口 / 关闭」。<b>终结</b>结束正在运行的外部命令;<b>清除</b>清空并收敛撤销历史。</li>
+<li>「上一个/下一个结果」按输出里的 <code>文件(行,列):</code> 行进并打开对应位置。</li>
+<li>报告从末尾追加,流式不换行接排;自动换行默认开(<code>[Output] Wrap</code>),工具条显隐 <code>[Output] ToolBar</code>。</li>
+<li>输出窗格是完整的第二编辑控件:可选中复制、滚轮 3 行/格。</li>
+</ul>
+
+<h3>17.7 查找结果</h3>
+<p>见 <a href="#findresult">6.6</a>。两级树、双击跳转、新结果自动弹出。</p>
+
+<h3>17.8 脚本窗格</h3>
+<p>皮肤脚本可以通过 <code>ui.layout:pane{...}</code> 声明自己的停靠窗格(见 <a href="#skins">19.8</a>),内容完全由脚本绘制,如随包示例 LuaPaint 的「时钟」窗格。</p>
+</section>
+
+<!-- ==================== 18 标签与窗口 ==================== -->
+<section class="chapter" id="tabs">
+<h2>18 文档标签与窗口管理</h2>
+
+<h3>18.1 文档标签条</h3>
+<table>
+<tr><th>操作</th><th>行为</th></tr>
+<tr><td>左键点击</td><td>切换文档并聚焦编辑区</td></tr>
+<tr><td>双击标签 / 中键</td><td>直接关闭(默认配置;可改「双击左键时关闭标签」)</td></tr>
+<tr><td>右键</td><td>先切换到该标签,再弹菜单(见下)</td></tr>
+<tr><td>标签上的 ✕</td><td>关闭该文档(按-松在同一格才生效,不会误切文档)</td></tr>
+<tr><td>滚轮</td><td>滚动标签带;<b>Ctrl+滚轮</b> 按顺序切换文档</td></tr>
+<tr><td>◀ / ▶ / ▾</td><td>滚动按钮;▾ 弹打开文档列表(当前文档打勾)</td></tr>
+</table>
+<p>标签右键菜单:「关闭 / 关闭其它窗口 / 关闭全部窗口 / —— / 关闭左侧窗口 / 关闭右侧窗口 / —— / 保存 / 另存为... / —— / 复制路径 / 复制文件名 / 在文件管理器中打开」。</p>
+<p>修改过的文档:标题后带 <code>*</code>,标签顶部有红色状态带;悬停任意标签时状态带变橙。「用文档的首行文本动态更新tab标题」开启后未命名文档会显示首行内容。</p>
+<div class="box note"><b>标签拖拽重排</b> <span class="badge na">尚未提供</span><br>标签顺序不能拖动调整;「在最右侧打开新标签」「关闭文件的时候优先激活左侧的标签」等选项影响新标签位置与激活顺序。</div>
+
+<h3>18.2 窗口菜单</h3>
+<table>
+<tr><th>命令</th><th>快捷键</th><th>状态</th></tr>
+<tr><td>下一个窗口 / 上一个窗口</td><td><kbd>Ctrl+Tab</kbd> / <kbd>Ctrl+Shift+Tab</kbd></td><td>可用</td></tr>
+<tr><td>下一个窗口(前后顺序) / 上一个窗口(前后顺序)</td><td>—</td><td>按最近使用顺序切换</td></tr>
+<tr><td>最近的窗口</td><td><kbd>F12</kbd></td><td>可用</td></tr>
+<tr><td>关闭 / 关闭其它窗口 / 关闭全部窗口</td><td><kbd>Ctrl+W</kbd> / <kbd>Ctrl+Shift+F4</kbd> / —</td><td>可用(关闭全部触发批量保存询问)</td></tr>
+<tr><td>关闭左侧窗口 / 关闭右侧窗口</td><td>—</td><td>标签右键菜单同款</td></tr>
+<tr><td>显示/隐藏所有面板</td><td><kbd>F7</kbd></td><td>可用</td></tr>
+<tr><td>切换焦点</td><td><kbd>Alt+\</kbd></td><td>可用</td></tr>
+<tr><td>窗口置顶</td><td>—</td><td>可用,切换总在最前</td></tr>
+<tr><td>垂直分割 / 水平分割 / 克隆视图 / 移动到分组 / 合并分组 / 同步滚动</td><td>—</td><td>可用(两张分割行带勾,勾上的那一行再点一次即取消分割;分割线可拖动)</td></tr>
+<tr><td>透明度(80%~10%/自定义)</td><td>—</td><td><span class="badge na">尚未提供</span></td></tr>
+</table>
+
+<h3>18.3 全屏与视图选项</h3>
+<ul>
+<li><b>全屏显示</b>(<kbd>F11</kbd>):隐藏标题栏、菜单栏、工具条、状态栏与全部停靠面板,客户区铺满屏幕;退出时逐一还原进入前的状态。</li>
+<li><b>隐藏主菜单</b>:「查看」→「工具栏」→「隐藏主菜单」,需要时再点回来。</li>
+<li>窗口位置与最大化状态记在 <code>[Window] Rect/Zoomed</code>,下次启动恢复。</li>
+</ul>
+</section>
+
+<!-- ==================== 19 外观 ==================== -->
+<section class="chapter" id="appearance">
+<h2>19 界面外观</h2>
+
+<h3 id="themes">19.1 主题</h3>
+<p>「工具」→「设置」→「主题」打开「主题」对话框(无模式,可常开):</p>
+<ul>
+<li><b>左侧列表</b>:全部主题(随包 <code>themes\*.ini</code>);顶部 <code>+</code> 复制当前主题为「原名 副本」,<code>×</code> 删除——内置主题会先询问「还原本内置主题?会删掉文件,回到随包的样子」,自建主题提示「删了就没了」。</li>
+<li><b>四个页签</b>,全部是表格编辑,双击格子改值:</li>
+</ul>
+<table>
+<tr><th>页签</th><th>可编辑内容</th></tr>
+<tr><td>颜色</td><td>每个区域的「背景/前景/值」与 8 个字形位(粗/斜/矩/下/删/双/点/波;下划线族互斥)。区域含 默认文本、选区、行号、折叠区域、书签、配对符号、标尺、查找结果、注释1/2、字符串1/2、数字、关键字1-4、函数、变量、运算符、高亮1-8、当前行、光标、缩进线、波浪线等 40 余项</td></tr>
+<tr><td>几何</td><td>13 项界面度量:状态栏高度(0 或 16..48)、状态格文字左边距(0..24)、状态格图标预留宽、状态格最小宽度、上下/左右分栏分隔带、文档页签高度(16/24/32)、页签左右内边距、页签关闭钮格宽、停靠页签高度、菜单行高、菜单左右内边距、工具栏图标格边长</td></tr>
+<tr><td>字体</td><td>6 个字体槽:界面正文、编辑器字面、文档页签、状态栏、菜单、停靠窗格;各设 字面/字号/字重/斜体(留空 = 系统默认)</td></tr>
+<tr><td>形状</td><td>已接线的区域的 圆角/空隙/描边/上下留白/字体(常态状态)</td></tr>
+</table>
+<ul>
+<li><b>应用</b>立即生效;<b>保存</b>把改动写进 <code>themes\&lt;名称&gt;.ini</code>(只写改过的行;段落 [Theme]/[Metrics]/[Fonts]/[Shape]),主题文件热重载——外部编辑主题文件也会即时反映。</li>
+<li><b>编辑器字体优先级</b>:主题 <code>[Fonts] mono.*</code> &gt;「工具 → 设置 → 设置字体」的 <code>[Font0..5] Font=</code> &gt; 内置 Consolas 10pt。主题一旦声明 <code>mono</code>(哪怕只写了 <code>mono.size</code>),编辑视图的字面、字号、字重、斜体就整条由主题决定;想让「设置字体」生效,把主题里那几行 <code>mono.*</code> 删掉。主题没有打印字体 token,<code>[Font8]</code> 打印字体槽不受这条优先级影响。</li>
+<li>底部状态行实时提示改了什么(<code>已写入 [Theme] xxx=… · 路径</code>);写不进时给出原因。</li>
+<li>高亮 capture 名(语法查询里的 <code>highlight1..8</code> 等)对应的颜色即这里的区域颜色。</li>
+</ul>
+
+<h3 id="darkmode">19.2 深色主题</h3>
+<ul>
+<li>「查看」→「深色主题」切换全局深/浅;深浅决定 <code>[Setting] DarkTheme</code>,并把编辑区主题切到 <code>[Setting] DarkEditTheme</code>(默认 DogEdit_Dark)或 <code>LightEditTheme</code>(默认 DogEdit)。</li>
+<li><b>重启生效</b>:切换后弹「深色主题将在重新启动DogEdit后生效。现在重新启动吗?」,答「是」自动重启。深色模式下菜单、对话框、消息框、滚动条都会跟随(由系统深色 API + 自绘补丁实现)。</li>
+<li>「深色/浅色」各自记住一个主题名,可以在「主题」对话框里分别定制。</li>
+</ul>
+
+<h3 id="fonts">19.3 字体与字号</h3>
+<ul>
+<li>「查看」→「字体」:「默认字体(Consolas,10)」与「自定义字体1–5」;「设置字体…」打开字体选择。</li>
+<li><b>字号缩放属于当前文档</b>:加大 <kbd>Ctrl+Plus</kbd>(或 <kbd>Ctrl+Shift+-</kbd>)/减小 <kbd>Ctrl+-</kbd>/原始字号 <kbd>Ctrl+0</kbd>;范围 4–72pt。与配置值相同时不落盘。</li>
+<li>界面字体在「选项 → 常规」页选(需重启);主题字体槽见 19.1;「选项 → 打印」页的「直接使用当前编辑器视图的字体」用于打印镜像 <span class="badge na">打印尚未提供</span>。</li>
+<li>文字渲染默认灰度抗锯齿(非 ClearType),整数列网格保证等宽对齐;缺字经系统回退链补齐。</li>
+</ul>
+
+<h3 id="viewflags">19.4 显示开关</h3>
+<p>「查看」菜单(部分在「符号显示」子菜单)的开关,全部即时生效并写入 <code>[Edit]</code>:</p>
+<table>
+<tr><th>开关</th><th>说明</th></tr>
+<tr><td>行号</td><td>行号沟;折叠时显示可见行号</td></tr>
+<tr><td>标尺</td><td>编辑区顶部刻度带,每个制表位一格</td></tr>
+<tr><td>当前行</td><td>光标行高亮;样式(背景色/下划实线/虚线/上下线)在「选项 → 样式」页</td></tr>
+<tr><td>缩进线</td><td>按缩进层级画竖线(实线/虚线可选)</td></tr>
+<tr><td>边界线 / 列标记</td><td>指定列位置的参考竖线</td></tr>
+<tr><td>空白字符 / 换行符 / 文档结束符 / 控制字符</td><td>不可见字符显示;样式(制表符箭头/线条/字符,空格大点/小点/线条)在样式页</td></tr>
+<tr><td>选择时全部显示</td><td>仅在选区内显示不可见字符</td></tr>
+<tr><td>折叠尾部字符</td><td>折叠行尾 <code>…</code> 指示</td></tr>
+<tr><td>扩展当前行背景 / 同层背景色</td><td>当前行带延伸到窗口右侧 / 同缩进层的背景带</td></tr>
+<tr><td>行修改状态</td><td>行号沟的修改/新增状态条</td></tr>
+<tr><td>显示书签</td><td>书签边栏标记</td></tr>
+<tr><td>图标区域</td><td>行号左侧的图标槽(LSP 诊断等)</td></tr>
+</table>
+
+<h3 id="toolbarui">19.5 工具栏</h3>
+<p>默认 42 格布局(分隔线以外的主要按钮):</p>
+<table>
+<tr><th>按钮</th><th>提示</th><th>备注</th></tr>
+<tr><td>新建 ▾</td><td>创建一个新的文档</td><td>下拉 = 新建子菜单(含模板)</td></tr>
+<tr><td>打开 / 保存 / 另存为</td><td>—</td><td></td></tr>
+<tr><td>撤销 / 重做</td><td>—</td><td>无可撤销内容时置灰</td></tr>
+<tr><td>剪切 / 复制 / 粘贴 ▾</td><td>—</td><td>粘贴下拉 = 进阶粘贴菜单</td></tr>
+<tr><td>自动换行 ▾</td><td>执行自动换行</td><td>本体点击 = 取消换行/智能换行切换</td></tr>
+<tr><td>单行注释</td><td>—</td><td></td></tr>
+<tr><td>查找 / 查找全部 / 替换 / 在文件中查找和替换</td><td>—</td><td></td></tr>
+<tr><td>批量替换</td><td>一键执行批量替换</td><td><span class="badge na">尚未提供</span></td></tr>
+<tr><td>HEX模式</td><td>以HEX模式显示并编辑当前文档</td><td></td></tr>
+<tr><td>录制/停止 / 回放 / 重复</td><td>宏</td><td>见第 21 章</td></tr>
+<tr><td>扩展管理器</td><td>在线安装或更新扩展</td><td><span class="badge na">尚未提供</span></td></tr>
+<tr><td>全屏模式</td><td>—</td><td></td></tr>
+<tr><td>大纲视图 / 快捷目录 / 文件列表 / 输出窗口 / 代码片段</td><td>面板开关</td><td></td></tr>
+<tr><td>FTP/SFTP</td><td>管理FTP/FTPS/SFTP服务器并编辑远程文件</td><td><span class="badge na">尚未提供</span></td></tr>
+<tr><td>Git 面板</td><td>显示或隐藏 Git 面板</td><td><span class="badge na">尚未提供</span></td></tr>
+<tr><td>Web预览</td><td>以内置浏览器预览当前文档</td><td><span class="badge na">尚未提供</span>(「外部浏览器预览」可用)</td></tr>
+<tr><td>关于</td><td>显示程序信息</td><td><span class="badge na">尚未提供</span></td></tr>
+</table>
+<p>工具栏右键菜单:「隐藏 / —— / 小图标(16*16) / 中图标(24*24) / 大图标(32*32) / —— / 上 / 下 / —— / 合并工具条(灰) / 多行显示 / —— / 自定义...」。</p>
+<ul>
+<li><b>自定义</b>(选项 → 工具条页):左列可用命令、右列当前布局,← 添加、→ 移除、≡ 插入分隔线、▲▼ 调序;布局存 <code>[ToolBar] Count/ToolBar</code>,点「应用」立即重建。</li>
+<li><b>图标主题</b>:「图标主题」下拉(exe 旁 <code>iconthemes\</code> 或 <code>%APPDATA%\dogedit\iconthemes</code> 下的主题文件夹,含 toolbar16/24/32.bmp 等;半成品逐张回落内置图标)。</li>
+<li>悬停提示来自命令说明表;图标按 DPI 缩放。</li>
+</ul>
+
+<h3 id="statusbarui">19.6 状态栏</h3>
+<p>文本档默认 13 格(HEX 文档固定 5 格),各格含义与点击行为:</p>
+<table>
+<tr><th>格</th><th>显示</th><th>点击</th></tr>
+<tr><td>消息(伸缩格)</td><td>「就绪」或最近命令的临时消息(约 5 秒后回落)</td><td>无</td></tr>
+<tr><td>文件大小</td><td>512 B / 290.7 KB / 1.3 MB / 1.1 G(1024 进制)</td><td>打开文件属性</td></tr>
+<tr><td>同步滚动</td><td>仅存在同步视图时显示</td><td>切换同步滚动(分割后可用)</td></tr>
+<tr><td>选区信息</td><td><code>N字符,M行</code>(无选区则空)</td><td>字符统计</td></tr>
+<tr><td>语法着色类型</td><td>语法显示名,无则「默认」</td><td>「切换文件类型」对话框</td></tr>
+<tr><td>制表符</td><td><code>制表符:N</code> 或 <code>软空格:N</code></td><td>菜单:2 / 4 / 8 / Other...(2~64)/ Soft Tab / Show Whitespaces</td></tr>
+<tr><td>光标行号 / 列号</td><td><code>行 N</code>(1 基)/ <code>列 N</code>(默认 1 基)</td><td>跳转到行</td></tr>
+<tr><td>光标处字符值</td><td><code>U+XXXX</code></td><td>无</td></tr>
+<tr><td>总行数</td><td>纯数字</td><td>跳转到行</td></tr>
+<tr><td>换行符类型</td><td>CRLF / LF / CR</td><td>菜单:PC (CR+LF) / Unix (LF) / Mac (CR),即选即改</td></tr>
+<tr><td>编辑模式</td><td>插入 / 覆写 / 列模式 / 多选</td><td>切换插入/覆写</td></tr>
+<tr><td>文件编码</td><td>UTF-8 / UTF-16 / GB18030 / CP 936 / ANSI 等;带 BOM 尾随 <code>+</code></td><td>菜单:指定编码加载 / 转换编码 / 文件头(BOM)</td></tr>
+<tr><td>偏移(仅 HEX)</td><td><code>偏移: %08X</code></td><td>无</td></tr>
+</table>
+<p>「选项 → 状态栏」页可勾选显示哪些格并用 ▲▼ 调序(存 <code>[Setting] SBPane</code>)。四格(编码/换行/制表符/语法)带图标位,宽度自适应文字,下限 45px。</p>
+
+<h3 id="minimap">19.7 文档地图与标尺</h3>
+<ul>
+<li><b>文档地图</b>(「查看」→「文档地图」,默认关):文本区右缘的窄条,1 像素/列、2 像素/行,按语法色淡显。<b>不缩放全文</b>——显示一个跟随视口的窗口框:拖框 = 滚动;点条上其它位置 = 把所点行滚到视图中部。活动区域样式三档:「动态隐藏」(指针悬停才现)/「背景色」/「边框」。</li>
+<li><b>标尺</b>(「查看」→「标尺」):编辑区顶部按制表位画刻度的带。</li>
+<li><b>覆盖式滚动条</b>:始终工作的胶囊滚动条,滑块半透明、下方有修改行标记(红=修改、绿=新增、灰=未改);指到条上会重新着色并浮现,静止后淡出。</li>
+</ul>
+
+<h3 id="skins">19.8 皮肤(脚本包)</h3>
+<ul>
+<li>皮肤是<b>普通脚本包</b>:随包示例 <code>packages\luapaint</code> 演示了全部能力。启用/停用走「工具 → 设置 → 脚本包」(见 21.3)。</li>
+<li>皮肤可以接管<b>状态栏逐格、文档页签、停靠页签、工具栏按钮底色、滚动条</b>的绘制(绘制回调返回 true = 接管),可以<b>追加工具栏按钮</b>(<code>ui.layout:toolbar{...}</code>),可以<b>声明新停靠窗格</b>(<code>ui.layout:pane{...}</code>),可以设置指针形状与跟踪提示。</li>
+<li>绘制回调是纯函数(拿不到文档内容),保证坏皮肤不会拖垮界面;脚本包停用后立即恢复内置绘制。</li>
+<li>调试:<code>dogedit --skin-debug</code>(或环境变量 <code>DOGEDIT_SKIN_DEBUG=1</code>)让每个绘制回调跑两遍比对,退出时报告副作用次数与缓存命中率;<code>dogedit --ui-lint 脚本.lua</code> 离线体检单个脚本;<code>--paint-stats</code> 报告绘制计时。</li>
+</ul>
+</section>
+
+<!-- ==================== 20 工具 ==================== -->
+<section class="chapter" id="tools">
+<h2>20 工具</h2>
+
+<h3 id="exttools">20.1 外部工具</h3>
+<p>「工具」→「外部工具」打开管理对话框;「工具」菜单底部动态列出已配置的工具(「01. 工具名」…)。</p>
+<h4>管理对话框</h4>
+<ul>
+<li><b>分组下拉</b>:工具按分组存放(「添加分组」命名,「删除分组」);工具列表单列,「添加 / 删除」增删工具,「图标」可指定图标路径。</li>
+<li>每个工具的四个字段:<b>标题 / 命令 / 参数 / 初始目录</b>——字段右侧的 ▼ 箭头弹出<b>变量菜单</b>:</li>
+</ul>
+<table>
+<tr><th>变量</th><th>含义</th></tr>
+<tr><td><code>$(FilePath)</code> / <code>$(FilePathNoExt)</code></td><td>当前文件完整路径 / 去扩展名</td></tr>
+<tr><td><code>$(FileDir)</code> / <code>$(FileName)</code> / <code>$(FileNameNoExt)</code> / <code>$(FileExt)</code></td><td>目录 / 文件名 / 无扩展名 / 扩展名</td></tr>
+<tr><td><code>$(AppPath)</code></td><td>dogedit.exe 路径</td></tr>
+<tr><td><code>$(CurLine)</code> / <code>$(CurLineText)</code> / <code>$(CurCol)</code></td><td>光标行号 / 行文本 / 列号</td></tr>
+<tr><td><code>$(CurSel)</code> / <code>$(CurWord)</code></td><td>选区文本 / 光标处单词</td></tr>
+<tr><td><code>$(UserArg1..4)</code></td><td>四个自定义参数位</td></tr>
+</table>
+<h4>动作模式</h4>
+<table>
+<tr><th>模式</th><th>行为</th></tr>
+<tr><td>无</td><td>只运行,不接输出</td></tr>
+<tr><td>捕获输出(隐藏窗口)</td><td>隐藏窗口运行,输出进输出窗口(可勾「接受输入」交互)</td></tr>
+<tr><td>捕获输出(显示窗口)</td><td>显示窗口运行,同时捕获输出</td></tr>
+<tr><td>捕获到Web预览</td><td>输出作为 HTML 预览 <span class="badge na">Web预览尚未提供</span></td></tr>
+<tr><td>插入 / 从新行插入</td><td>把输出插入光标处 / 新行</td></tr>
+<tr><td>替换当前行 / 替换文档</td><td>输出替换当前行 / 整篇</td></tr>
+<tr><td>隐藏方式运行</td><td>完全后台,无窗口无捕获</td></tr>
+</table>
+<h4>「高级」子对话框</h4>
+<ul>
+<li><b>使用输出定位</b>:配「正则表达式」+ 三个「捕获」下拉(文件路径/行号/列号,各选 捕获 1–9 或 无),让「下一个/上一个结果」能按工具输出格式跳转打开文件。</li>
+<li><b>保存模式</b>:无 / 保存当前文档 / 保存全部文档(运行前自动保存)。</li>
+<li><b>输出编码</b>:按代码页解释工具输出(UTF-16/32 页除外)。</li>
+</ul>
+<h4>完成通知</h4>
+<ul>
+<li>工具运行结束:任务栏按钮闪烁 + 徽标(成功绿色对勾 / 失败红色叉)+ 满格进度状态(成功系统强调色 / 失败红色)。Windows 11 只把它画成图标下方约 30×4 像素的细线,完成时直接满格显示该颜色,不再闪动。窗口在前台时 6 秒后三项一起摘除;<b>窗口在后台时一直保留</b>,直到用户点击任务栏激活窗口才摘除(倒计时期间切走也一样保留)。可选提示音(「选项 → 常规」页,成功和失败可各指定一个 .wav,留空用该系统提示音)。三项提醒各有独立开关;<code>App.taskbar</code> 让 Lua 脚本驱动同一块进度状态,见 <a href="script_api.html">script_api.html</a> 5.1。</li>
+</ul>
+
+<h3 id="sort">20.2 排序</h3>
+<ul>
+<li><b>升序排序</b> <kbd>F9</kbd> / <b>降序排序</b> <kbd>Shift+F9</kbd>:对选区(无选区则整篇)排序。</li>
+<li><b>高级排序</b> <kbd>Ctrl+F9</kbd>:弹菜单选比较键——「按照字母排序」(ASCII 折叠,<code>a</code> = <code>A</code>)、「按照数字排序(01,02…09,10…)」(数字串按数值,前导零参与)、「按照长度排序」(按字符数);另有「排序到新文档(*速度快)」开关(超过 10 万字符时自动询问重定向)。</li>
+</ul>
+
+<h3 id="misc-tools">20.3 其它工具</h3>
+<table>
+<tr><th>命令</th><th>说明</th></tr>
+<tr><td>Base64</td><td>见 4.8;「指定编码」两条 <span class="badge na">尚未提供</span></td></tr>
+<tr><td>选区求和</td><td>见 4.8</td></tr>
+<tr><td>日期/时间插入</td><td>见 4.8</td></tr>
+<tr><td>文件比较 / 文件比较(外部)</td><td><span class="badge na">尚未提供</span></td></tr>
+<tr><td>序列</td><td><span class="badge na">尚未提供</span>(生成有序文本)</td></tr>
+<tr><td>取色器</td><td><span class="badge na">尚未提供</span></td></tr>
+<tr><td>加密/解密</td><td><span class="badge na">尚未提供</span></td></tr>
+<tr><td>拼写检查</td><td><span class="badge na">尚未提供</span>(三个子项均灰)</td></tr>
+<tr><td>外部浏览器预览</td><td>用系统默认或指定浏览器打开当前文档(选项 → Web预览页可指定浏览器,主机/目录映射可将本地路径映射为 URL)</td></tr>
+<tr><td>Web预览(内置)</td><td><span class="badge na">尚未提供</span></td></tr>
+</table>
+</section>
+
+<!-- ==================== 21 宏与脚本 ==================== -->
+<section class="chapter" id="macro">
+<h2>21 宏与 Lua 脚本</h2>
+
+<h3>21.1 宏</h3>
+<p>「扩展」→「宏」:</p>
+<table>
+<tr><th>命令</th><th>快捷键</th><th>说明</th></tr>
+<tr><td>录制/停止</td><td><kbd>Ctrl+Shift+M</kbd></td><td>开始/结束录制;录制的编辑作为复合撤销一步</td></tr>
+<tr><td>暂停</td><td>—</td><td>暂停录制,此间的编辑不入宏</td></tr>
+<tr><td>回放</td><td><kbd>Ctrl+Shift+P</kbd></td><td>执行缓存中的宏 1 次</td></tr>
+<tr><td>重复播放</td><td>—</td><td>重复执行当前脚本/宏</td></tr>
+<tr><td>保存宏为脚本</td><td>—</td><td>把当前宏存成脚本文件</td></tr>
+<tr><td>读取</td><td>—</td><td>载入 <code>.mac</code> 宏文件到缓冲</td></tr>
+<tr><td>宏编辑</td><td><span class="badge na">尚未提供</span></td><td>—</td></tr>
+<tr><td>刷新脚本菜单</td><td>—</td><td>重扫 macro 目录</td></tr>
+</table>
+<ul>
+<li>「扩展」菜单底部动态列出 macro 目录下的 <code>.mac</code> 脚本:<b>普通点击</b>载入并运行;<b>Ctrl+点击</b>载入宏缓冲后播放;<b>Shift+点击</b>用编辑区打开。</li>
+<li>可以把快捷键直接绑定到脚本:在「快捷键管理」里把 <code>.mac</code>/<code>.macro</code> 文件拖进列表,或手工在 <code>key.ini</code> 写 <code>组合键=脚本路径</code>。</li>
+</ul>
+
+<h3>21.2 Lua 脚本</h3>
+<p>DogEdit 内嵌 <b>Lua 5.4 沙箱</b>(mlua),脚本常驻进程、支持热重载(改文件即重跑,语法错误的版本不会顶掉正在工作的版本)。</p>
+<h4>安全边界</h4>
+<ul>
+<li>只开放 coroutine/table/string/math/utf8 五个标准库——<b>没有 os、io</b>;唯一时钟是 <code>App.now()</code>,唯一 I/O 是 bridge 提供的。</li>
+<li>内存上限 64 MB;每个入口调用 2000 万条指令预算(死循环会被掐掉);定时器 ≤64 个;待办队列 ≤256。</li>
+<li>日志(<code>print</code> / <code>App.log</code> / 报错)落到 stderr(前缀 <code>[lua] </code>)与调试输出;<code>App.alert</code> 弹消息框(标题 DogEdit Lua)。</li>
+<li><code>--safe-mode</code> 启动则一条脚本都不跑;「脚本包」对话框停用的包写 <code>[Scripts] Disabled</code>。</li>
+</ul>
+<h4>脚本来源</h4>
+<table>
+<tr><th>根</th><th>来源</th></tr>
+<tr><td><code>exe目录\packages\</code></td><td>随包(只读)</td></tr>
+<tr><td><code>%LOCALAPPDATA%\DogEdit\packages\</code></td><td>用户安装</td></tr>
+<tr><td><code>工作目录\packages\</code></td><td>开发中(优先级最高,「正在改的那份赢」)</td></tr>
+<tr><td><code>exe目录\scripts\*.lua</code> 与 <code>工作目录\scripts\*.lua</code></td><td>散装脚本,免清单,包名=文件名</td></tr>
+</table>
+<p>同名包后面的根覆盖前面的。</p>
+<h4>脚本包清单 package.toml</h4>
+<pre><code>api = 1                          # 必须(只有 1 被接受;写了 kind/facets/permissions 会报错)
+id = "luapaint"                  # 必填;a-z 0-9 . _ -,≤64 字符
+name = "LuaPaint"                # 显示名,可省
+version = "1.0.0"                # 可省
+description = "…"                # 可省
+order = 90                       # 同依赖层内小的先装,可省
+requires = ["dogedit &gt;= 0.9"]    # 只认 &gt;=,可省
+launch = "贪吃蛇(&amp;S)"        # 可省;写了就是按需启动,见下
+scripts = ["paint.lua"]          # 可省;缺省 = 目录下所有 *.lua 按文件名排序</code></pre>
+<p><b>按需启动(<code>launch</code>)</b>:写了这一行的包开机<b>一条脚本都不跑</b>,「扩展」菜单里只多一行(文字就是这个值)。点它才装载、建窗格、起心跳;关掉那块窗格(或再点一次菜单,行文字会变成「关闭 …」)就整包退出,注册全摘并跑一次 Lua GC 把内存还回去。适合游戏、向导这类「想玩才开」的东西。不写 <code>launch</code> 的包仍按老规矩随启动装载。按需包里 <code>App.command</code> 注册的是内部命令,不会占掉扩展菜单好几行。</p>
+<h4>API 摘要(1 基行号、1 基字节列)</h4>
+<table>
+<tr><th>入口</th><th>能力</th></tr>
+<tr><td><code>App</code></td><td><code>version/alert/log/prompt/now/timer(ms,fn[,repeat])/cancel/taskbar(state[,completed[,total]])/defer/run(命令名)/command(注册命令)/keymap(绑键)/pending/storage/on(事件)</code>;<code>print</code> 即日志</td></tr>
+<tr><td><code>App.doc</code></td><td><code>name/path/line_count/line(n)/line_len(n)/text/span_text/insert/replace/delete/meta()</code>(编码、BOM、EOL、语法、只读、修改、大文件)</td></tr>
+<tr><td><code>App.sel</code></td><td><code>count/get([i])/text/set(sl,sc,el,ec)</code></td></tr>
+<tr><td><code>App.view</code></td><td><code>info()</code>(视口与光标)/<code>scroll_to(line[,col])</code></td></tr>
+<tr><td><code>App.theme</code></td><td><code>name()/color(token)/list()</code>(只读)</td></tr>
+<tr><td><code>App.ui.style</code></td><td>运行时外观覆盖:set/reset/get(token)、metric(s)、shape(s)、font(s)——键名即主题文件写法,调试完可粘回主题 ini</td></tr>
+<tr><td><code>App.ui.paint</code></td><td>接管绘制:<code>on(region,fn)/off/list/hint(指针与提示)</code>;区域:status.pane、tab、dock.tab、scroll.v、toolbar.button、editor.overlay、editor.gutter、pane.&lt;id&gt; 等</td></tr>
+<tr><td><code>App.ui.layout</code></td><td><code>pane{}</code> 声明停靠窗格、<code>status{}</code> 整条替换状态栏、<code>toolbar{}</code> 追加按钮、<code>update/remove/list</code></td></tr>
+<tr><td>事件</td><td><code>App.on("doc.saved",fn)</code>、<code>App.on("doc.opened",fn)</code>(当前版本仅这两个事件有触发点;其它事件名可注册但不会触发)</td></tr>
+</table>
+<p>普通脚本包注册的命令经 <code>App.command(name, fn)</code> 进入「扩展」菜单底部(「Lua: 命令名」),id 段 35400+;按需启动包一人一行在 35500+ 段,它们的内部命令不上菜单。<code>App.storage(name)</code> 的数据落 <code>&lt;exe目录&gt;\scripts\storage.json</code>。脚本使用与 API 的完整参考见 <a href="script_api.html">script_api.html</a>(同目录,含绘制、布局、外观与包格式)。</p>
+
+<h3>21.3 脚本包管理</h3>
+<p>「工具」→「设置」→「脚本包…」打开「脚本包」对话框:</p>
+<ul>
+<li>带勾选框的表,列「包 / 版本 / 来源(随包/用户/开发/散装)/ 状态(已启用/已停用/被同名覆盖/装载失败:…)/ 脚本」。</li>
+<li>摘要行:「共 N 个包,已启用 M 个。取消勾选的包下次启动不再装载(不删文件)。」另有坏清单提示。</li>
+<li>底部详情显示选中包的目录;「全选 / 全不选 / 打开目录 / 确定 / 取消」。</li>
+<li>停用立即生效:该包的注册全摘、窗格当场拆掉;重新启用立即按依赖顺序重跑。<b>按需启动包</b>例外 —— 启用只是让「扩展」菜单那一行回来,脚本要用户点一下才跑;状态列会写「按需启动(点扩展菜单)」或「运行中(按需启动)」。</li>
+<li>命令行 <code>dogedit --packages</code> 不开窗打一张包报告;<code>dogedit --ui-doctor</code>(加 <code>--strict</code> 把提醒算错)把包真装一遍并检查全部主题,可作 CI 闸门。</li>
+</ul>
+</section>
+
+<!-- ==================== 22 文件安全 ==================== -->
+<section class="chapter" id="safety">
+<h2>22 文件安全:备份、会话与恢复</h2>
+<p class="lead">两套互不替代的机制:<b>自动备份</b>是按间隔落盘的崩溃兜底(独立恢复对话框),<b>会话</b>是退出时刻的快照(下次启动静默还原)。</p>
+
+<h3>22.1 自动备份与本地历史</h3>
+<table>
+<tr><th>设置([Save])</th><th>默认</th><th>说明</th></tr>
+<tr><td>使用自动备份 AutoBackup</td><td>关</td><td>总开关(选项 → 备份页)</td></tr>
+<tr><td>自动保存时间间隔 AutoSaveTime</td><td>0(禁止)</td><td>分钟;环境变量 <code>DOGEDIT_BACKUP_MS</code> 可覆盖毫秒数</td></tr>
+<tr><td>大文件阈值 BigFile</td><td>4 MB</td><td>超过不备份(1..100000)</td></tr>
+<tr><td>每个文件保留的版本数 BackupVersions</td><td>10</td><td>1..500</td></tr>
+<tr><td>历史保留天数 KeepDays</td><td>30</td><td>0=永久(0..3650)</td></tr>
+<tr><td>历史总大小上限 BudgetMB</td><td>256</td><td>0=不限制(0..65536)</td></tr>
+<tr><td>自定义文件夹 Dir</td><td>空</td><td>默认 <code>%LOCALAPPDATA%\DogEdit\backup\&lt;路径哈希&gt;\</code></td></tr>
+</table>
+<ul>
+<li>每版一对:<code>vNNNN.dgab</code>(源编码原样字节)+ <code>vNNNN.ini</code>(时间、大小、哈希、光标);外加 <code>doc.ini</code>(原路径、标题)。</li>
+<li>写入 = 临时文件 → 改名,崩溃安全;大文件模式不备份。</li>
+<li><b>恢复</b>:「文件」→「备份与历史…」按文件浏览/恢复/另存任意版本;若上次没退干净(有未落盘内容),启动后自动弹恢复询问,列出有未保存内容的备份。</li>
+</ul>
+
+<h3>22.2 会话与热保存</h3>
+<p>「选项 → 会话」页五个开关:</p>
+<table>
+<tr><th>选项</th><th>默认</th><th>含义</th></tr>
+<tr><td>启动时恢复上次退出前未关闭的文件</td><td>关</td><td>按退出时的标签清单重开</td></tr>
+<tr><td>记忆曾经打开过的文件的光标位置</td><td>开</td><td>每文件记 行,列(上限 256 个文件,超限丢最久未用)</td></tr>
+<tr><td>记忆/恢复书签</td><td>关</td><td>书签随会话回填</td></tr>
+<tr><td>记忆/恢复被修改的文件的内容(热保存)</td><td>关</td><td>未保存的<b>内容</b>也存(<code>hot\*.dgab</code>,源编码原样字节);恢复成带 <code>*</code> 的脏标签</td></tr>
+<tr><td>临时文件夹</td><td>空</td><td>默认 <code>%LOCALAPPDATA%\DogEdit\session</code></td></tr>
+</table>
+<p>退出时序:先写会话快照与热保存,再逐文档询问保存;答「是」会删掉对应热保存(防止还原重复),选「否」或取消退出则保留。热保存保留 30 天后自动清理。命名会话(3.6)独立于这套自动机制。</p>
+</section>
+
+<!-- ==================== 23 选项 ==================== -->
+<section class="chapter" id="options">
+<h2>23 「选项」对话框逐页参考</h2>
+<p class="lead">「工具」→「设置」→「常规…」打开「选项」对话框;左侧类别树,右侧属性页,底部「确定 / 取消 / 应用 / 帮助」。属性页是「属性列表」风格:勾选行原地切换,值行显示「标签 值」,点击弹内联编辑或下拉。确定=应用+关闭;只写有变化的键。</p>
+
+<h3 id="opt-general">23.1 常规</h3>
+<table>
+<tr><th>选项</th><th>默认</th><th>说明</th></tr>
+<tr><td>记忆最近打开的文件个数(0~64)</td><td>16</td><td>「最近的文件」菜单长度</td></tr>
+<tr><td>开始页显示最近的文件</td><td>开</td><td>—</td></tr>
+<tr><td>允许多个实例同时运行</td><td>关</td><td>当前版本本就无单实例限制,此开关暂无运行时效果</td></tr>
+<tr><td>右键菜单添加:用 DogEdit 打开</td><td>关</td><td>写注册表,资源管理器所有文件右键加「用 DogEdit 打开」</td></tr>
+<tr><td>右键菜单添加:在文件中查找</td><td>关</td><td>写注册表,目录右键加「用 DogEdit 在文件中查找」</td></tr>
+<tr><td>在菜单上显示一个小剪刀(需重启)</td><td>开</td><td>菜单撕离把手</td></tr>
+<tr><td>主工具条的背景使用系统样式</td><td>开</td><td>—</td></tr>
+<tr><td>在停靠窗口上使用编辑区配色</td><td>关</td><td>面板底色跟随编辑区主题</td></tr>
+<tr><td>标题栏不显示路径信息, 只显示文件名称</td><td>关</td><td>—</td></tr>
+<tr><td>界面使用的字体(需重启)</td><td>系统默认</td><td>候选含 Tahoma / Segoe UI / Meiryo / Verdana 各字号</td></tr>
+<tr><td>检查最新版本</td><td>一周一次</td><td>一天一次 / 一周一次 / 一月一次 / 禁止更新</td></tr>
+<tr><td>外部工具执行完成后闪烁任务栏按钮(颜色由系统决定,成败看图标徽标)</td><td>开</td><td>整块任务栏按钮闪动;前台闪 5 次,后台持续闪到点击任务栏激活窗口;成功绿勾 / 失败红叉由徽标区分</td></tr>
+<tr><td>外部工具执行完成后任务栏按钮显示进度(成功系统强调色,失败红色)</td><td>开</td><td>任务栏按钮上的满格进度状态,直接显示颜色、不再闪动;前台 6 秒后摘除,后台一直保留到点击任务栏激活窗口;Lua 可用 <code>App.taskbar</code> 驱动同一块状态</td></tr>
+<tr><td>外部工具执行完成后播放提示音</td><td>开</td><td>成功/失败可分别指定 .wav;留空时成功播系统提示音、失败播系统错误音</td></tr>
+<tr><td>成功提示音文件 / 失败提示音文件</td><td>空(系统提示音)</td><td>各选一个 .wav;两行都留空时成功用系统 OK 声、失败用系统错误声</td></tr>
+</table>
+
+<h3 id="opt-session">23.2 会话</h3>
+<p>见 <a href="#safety">22.2</a> 的五选项表(恢复文件 / 光标 / 书签 / 热保存 / 临时文件夹),不赘述。</p>
+
+<h3 id="opt-lang">23.3 语言</h3>
+<ul>
+<li>「选择您的界面语言(需重启)」:列出 <code>lang\</code> 下的语言表;切换弹确认「您需要重启 DogEdit 以应用该设置!」。</li>
+<li>显示语言表的作者/主页信息。新语言 = 放一个新 <code>.lng</code> 文件(可按 Windows LCID 命名如 <code>1041.lng</code>);语言选择存 <code>[Setting] Language</code>(空=跟随系统)。</li>
+</ul>
+
+<h3 id="opt-file">23.4 编辑 → 文件</h3>
+<table>
+<tr><th>选项</th><th>默认</th><th>说明</th></tr>
+<tr><td>新建文件或0字节文件:格式</td><td>CRLF (PC)</td><td>LF (Linux) / CR (MacOS) 可选(<code>[Setting] DefaultFileFormat</code>)</td></tr>
+<tr><td>编码</td><td>ANSI</td><td>ANSI / UTF-8 / UTF-8+BOM / UTF-16 LE / UTF-16 BE / GBK / Shift-JIS(<code>[Setting] DefaultEncoding</code>)</td></tr>
+<tr><td>监视文件变化</td><td>关</td><td>外部改动监视(<code>[Setting] MonitorFile</code>)</td></tr>
+<tr><td>启动时创建一个空白文件</td><td>关</td><td>—</td></tr>
+<tr><td>编码探测</td><td>关</td><td>ANSI→UTF-8 自动转换(<code>[Setting] ANSI2UTF8</code>)</td></tr>
+<tr><td>文件未被修改时也可以保存</td><td>关</td><td>—</td></tr>
+<tr><td>只读文件的修改</td><td>修改时提示</td><td>蜂鸣 / 修改时提示 / 保存时提示 / 不提示</td></tr>
+<tr><td>默认模式</td><td>—</td><td>新文档默认只读姿态(<code>[Edit] ReadOnly</code>)</td></tr>
+<tr><td>类型</td><td>默认</td><td>新文档默认语法(<code>[Syntax] Default</code>)</td></tr>
+</table>
+
+<h3 id="opt-template">23.5 编辑 → 模板</h3>
+<ul>
+<li>模板列表的「标题 / 类型 / 模板文件」三字段,▲▼ 排序,✎ 打开模板文件,「新建模板」弹输入框。</li>
+<li>「以snippet形式插入模板文件(限制4KB)」:模板内容走片段引擎展开(默认开)。</li>
+<li>「模板文件使用自身的编码和换行符」:新文档沿用模板文件自己的编码/EOL。</li>
+<li>落盘 <code>template.ini</code> 的 <code>[Temp] / [TempN]</code> 段,见 26.3。</li>
+</ul>
+
+<h3 id="opt-backup">23.6 编辑 → 备份</h3>
+<p>即 22.1 的七个设置项(总开关、自定义文件夹、大文件阈值、间隔、版本数、保留天数、总配额)。</p>
+
+<h3 id="opt-edit">23.7 编辑 → 编辑</h3>
+<table>
+<tr><th>选项</th><th>默认</th></tr>
+<tr><td>选区文本保持语法高亮的前景色</td><td>开</td></tr>
+<tr><td>选区文本的背景色扩展到窗口右侧</td><td>开</td></tr>
+<tr><td>移动光标时保持选区或者查找高亮</td><td>开</td></tr>
+<tr><td>按下Tab时跳出刚刚自动输入的配对字符</td><td>开</td></tr>
+<tr><td>光标列号从1开始计数</td><td>开</td></tr>
+<tr><td>当光标距边界?行时进行滚动(0~16)</td><td>0</td></tr>
+<tr><td>禁止出现在行头的字符 / 行尾的字符</td><td>中文标点禁排集(见 4.9)</td></tr>
+<tr><td>强制剪贴板的换行符格式</td><td>(空=不强转)</td></tr>
+<tr><td>中文括号(必须配对输入)</td><td>(空)</td></tr>
+<tr><td>选区高亮最大字符数</td><td>64</td></tr>
+</table>
+
+<h3 id="opt-style">23.8 编辑 → 样式</h3>
+<table>
+<tr><th>选项</th><th>候选 / 默认</th></tr>
+<tr><td>折叠样式</td><td>简洁 / 矩形 / 箭头 / 矩形和线条(默认) / 五边形 / 圆形图标</td></tr>
+<tr><td>光标样式</td><td>默认 / 纤细 / 字宽 / DOS样式</td></tr>
+<tr><td>光标效果</td><td>关 / 呼吸 / 呼吸+柔光 / 呼吸+柔光+脉冲 / 全套(+滑动);光标由独立合成层驱动,动画零 CPU 开销</td></tr>
+<tr><td>当前行样式</td><td>背景色(默认) / 下划实线 / 下划虚线 / 上下实线 / 上下虚线</td></tr>
+<tr><td>制表符样式</td><td>箭头 / 线条 / 箭头线 / 字符(默认)</td></tr>
+<tr><td>空格样式</td><td>大点 / 小点(默认) / 线条</td></tr>
+<tr><td>文档地图活动区域</td><td>动态隐藏(默认) / 背景色 / 边框</td></tr>
+<tr><td>行编辑状态栏的宽度</td><td>1 / 2</td></tr>
+<tr><td>缩进线</td><td>实线(默认) / 虚线</td></tr>
+<tr><td>书签</td><td>默认 / 箭头</td></tr>
+<tr><td>总是隐藏垂直/水平滚动条</td><td>关</td></tr>
+<tr><td>垂直滚动条上显示工具条</td><td>开</td></tr>
+</table>
+
+<h3 id="opt-complete">23.9 编辑 → 自动完成</h3>
+<ul>
+<li><b>触发按键</b>:回车(默认)/ 空格 / 制表符 / Esc键——确认候选的按键。</li>
+<li><b>匹配方法</b>:默认(前缀)/ 部分匹配 / 模糊匹配。</li>
+<li><b>使用数字键1~9选择候选词(默认是ALT+1~9)</b>:关。</li>
+<li><b>全部</b>(来源清单):<code>@ 代码片段</code> <code>- 上下文单词</code> <code>* 关键字</code> <code># 工程符号</code> <code>~ 文件名称</code>;<b>已选择</b>默认 "123"。当前版本实际提供的来源为文档单词与 LSP(手动),其余来源为后续扩展位。</li>
+</ul>
+
+<h3 id="opt-perf">23.10 编辑 → 性能</h3>
+<table>
+<tr><th>选项</th><th>默认</th><th>说明</th></tr>
+<tr><td>当文件行数小于?时自动换行</td><td>50000</td><td>超大行数不参与自动换行</td></tr>
+<tr><td>当文件小于?(MB)时直接用内存打开</td><td>256</td><td>当前版本尚未接入运行时(大文件阈值内置 50 MB,见第 15 章)</td></tr>
+<tr><td>自动编码探测缓存大小(KB)</td><td>4</td><td>4..10000</td></tr>
+<tr><td>查找全部时,限制每次输出的文本的大小</td><td>500</td><td>100..4000</td></tr>
+<tr><td>大文件语法着色的行数上限</td><td>500000</td><td>—</td></tr>
+</table>
+
+<h3 id="opt-print">23.11 编辑 → 打印</h3>
+<ul>
+<li>「直接使用当前编辑器视图的字体」:关。</li>
+<li>「边距(毫米)」上/下/左/右,默认各 16(0..200)。</li>
+<li>「页眉 / 页脚」:token 菜单可插入 <code>%Y-%m-%d</code>(日期)、<code>%H:%M:%S</code>(时间)等;默认页眉左置文件名、页脚中置「当前页/总页数」。</li>
+<li>打印命令本身 <span class="badge na">尚未提供</span>。</li>
+</ul>
+
+<h3 id="opt-tab">23.12 高级 → 标签</h3>
+<table>
+<tr><th>选项</th><th>默认</th></tr>
+<tr><td>多文档标签样式 / 停靠窗格标签样式</td><td>默认(另:平坦 / 渐变填充 / 位图填充)</td></tr>
+<tr><td>激活Tab的背景色</td><td>取色器选色</td></tr>
+<tr><td>在标签上显示图标</td><td>开</td></tr>
+<tr><td>当文档被修改时显示星号(*)</td><td>开</td></tr>
+<tr><td>在主程序下方显示标签栏</td><td>关(标签栏默认在上)</td></tr>
+<tr><td>使各项目为固定宽度 / 固定宽度的大小(50~300像素)</td><td>关 / 250</td></tr>
+<tr><td>当仅有一个标签时隐藏标签栏</td><td>开</td></tr>
+<tr><td>显示滚动按钮 / 显示文件下拉按钮</td><td>开 / 开</td></tr>
+<tr><td>在右侧显示全局关闭按钮 / 在每一项中显示关闭按钮</td><td>关 / 开</td></tr>
+<tr><td>双击左键时关闭标签</td><td>开</td></tr>
+<tr><td>用文档的首行文本动态更新tab标题</td><td>关</td></tr>
+<tr><td>没有文档时,执行关闭文档命令则退出程序</td><td>关</td></tr>
+<tr><td>在最右侧打开新标签</td><td>关</td></tr>
+<tr><td>关闭文件的时候优先激活左侧的标签</td><td>关</td></tr>
+</table>
+
+<h3 id="opt-statusbar">23.13 高级 → 状态栏</h3>
+<p>「自定义状态栏的显示」:双列可勾选列表 + ▲▼ 调序。字段名:光标行号 / 光标列号 / 光标处字符值 / 总行数 / 文件编码 / 编辑模式 / 换行符类型 / 制表符 / 语法着色类型 / 选区信息 / 同步滚动 / 文件大小 / 外部工具。默认顺序见 19.6。</p>
+
+<h3 id="opt-toolbar">23.14 高级 → 工具条</h3>
+<p>见 19.5:可用命令与当前布局两列、←→≡▲▼ 按钮、「图标主题」下拉与「打开目录」。</p>
+
+<h3 id="opt-web">23.15 高级 → Web预览</h3>
+<ul>
+<li>「主机/目录 设置」:本地目录 → URL 主机的映射表(添加/修改/删除,子对话框「主机/目录映射」)。</li>
+<li>「外部浏览器」:系统默认浏览器(默认)/ IE / Firefox / Chrome / Opera / 其它浏览器(指定路径);供「外部浏览器预览」命令使用。</li>
+</ul>
+
+<h3 id="opt-misc">23.16 其它 → 二进制 / 代理</h3>
+<ul>
+<li><b>二进制</b>:「以HEX模式打开扩展名为下面的文件」,默认 <code>dat;exe;bin;dll;hex;zip;rar</code>(<code>[HEX] Ext</code>)。</li>
+<li><b>代理</b>:代理服务器类型(无 / HTTP CONNECT / SOCKS5)+ 主机/端口/用户名/密码(<code>[Proxy]</code>),用于解析器下载等联网功能。</li>
+</ul>
+</section>
+
+<!-- ==================== 24 快捷键 ==================== -->
+<section class="chapter" id="keys">
+<h2>24 快捷键参考</h2>
+<p class="lead">快捷键全部定义在 <code>key.ini</code>(exe 旁边,可编辑);程序按「exe 目录 → 工作目录 → 内置默认表」的顺序读取。下面是内置默认的全部键位(138 条)。</p>
+
+<h3>24.1 默认键位表</h3>
+<h4>文件</h4>
+<table>
+<tr><th>快捷键</th><th>命令</th></tr>
+<tr><td><kbd>Ctrl+N</kbd></td><td>新建</td></tr>
+<tr><td><kbd>Ctrl+O</kbd></td><td>打开</td></tr>
+<tr><td><kbd>Ctrl+S</kbd></td><td>保存</td></tr>
+<tr><td><kbd>Ctrl+Shift+S</kbd></td><td>另存为</td></tr>
+<tr><td><kbd>Ctrl+W</kbd> / <kbd>Ctrl+F4</kbd></td><td>关闭当前文档</td></tr>
+<tr><td><kbd>Ctrl+Shift+F4</kbd></td><td>关闭其它窗口</td></tr>
+<tr><td><kbd>Alt+F4</kbd></td><td>退出</td></tr>
+<tr><td><kbd>Ctrl+Shift+T</kbd></td><td>恢复最后关闭的文件</td></tr>
+</table>
+<h4>编辑:撤销与剪贴板</h4>
+<table>
+<tr><th>快捷键</th><th>命令</th></tr>
+<tr><td><kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd></td><td>撤销 / 重做</td></tr>
+<tr><td><kbd>Ctrl+X</kbd> / <kbd>Ctrl+C</kbd> / <kbd>Ctrl+V</kbd></td><td>剪切 / 复制 / 粘贴(<kbd>Shift+Ins</kbd> 同粘贴)</td></tr>
+<tr><td><kbd>Ctrl+Shift+C</kbd></td><td>追加复制</td></tr>
+<tr><td><kbd>Ctrl+Shift+V</kbd></td><td>列模式粘贴</td></tr>
+<tr><td><kbd>Ctrl+K</kbd>,<kbd>Ctrl+V</kbd></td><td>从剪贴板历史中粘贴</td></tr>
+<tr><td><kbd>Ins</kbd></td><td>覆写/插入模式切换</td></tr>
+</table>
+<h4>编辑:删除与行操作</h4>
+<table>
+<tr><th>快捷键</th><th>命令</th></tr>
+<tr><td><kbd>Backspace</kbd> / <kbd>Del</kbd></td><td>删除上一个 / 下一个字符</td></tr>
+<tr><td><kbd>Ctrl+Backspace</kbd> / <kbd>Ctrl+Del</kbd></td><td>向左 / 向右删除单词</td></tr>
+<tr><td><kbd>Ctrl+L</kbd></td><td>删除当前行</td></tr>
+<tr><td><kbd>Ctrl+J</kbd></td><td>重复行</td></tr>
+<tr><td><kbd>Ctrl+T</kbd></td><td>交换字符</td></tr>
+<tr><td><kbd>Ctrl+Shift+J</kbd></td><td>合并行</td></tr>
+<tr><td><kbd>Alt+↑</kbd> / <kbd>Alt+↓</kbd></td><td>上移行 / 下移行</td></tr>
+<tr><td><kbd>Ctrl+Enter</kbd> / <kbd>Shift+Enter</kbd></td><td>在当前行之后 / 之前新建行</td></tr>
+</table>
+<h4>编辑:大小写、缩进、注释</h4>
+<table>
+<tr><th>快捷键</th><th>命令</th></tr>
+<tr><td><kbd>Ctrl+U</kbd> / <kbd>Ctrl+Shift+U</kbd></td><td>转大写 / 转小写</td></tr>
+<tr><td><kbd>Ctrl+I</kbd> / <kbd>Ctrl+Shift+I</kbd></td><td>缩进 / 反缩进</td></tr>
+<tr><td><kbd>Ctrl+/</kbd></td><td>单行注释</td></tr>
+<tr><td><kbd>Ctrl+Shift+/</kbd></td><td>多行注释</td></tr>
+</table>
+<h4>查找与替换</h4>
+<table>
+<tr><th>快捷键</th><th>命令</th></tr>
+<tr><td><kbd>Ctrl+F</kbd></td><td>查找(打开查找条)</td></tr>
+<tr><td><kbd>Ctrl+H</kbd> / <kbd>Ctrl+R</kbd></td><td>替换(打开替换条)</td></tr>
+<tr><td><kbd>F3</kbd> / <kbd>Shift+F3</kbd></td><td>查找下一个 / 上一个</td></tr>
+<tr><td><kbd>Ctrl+F3</kbd> / <kbd>Ctrl+Shift+F3</kbd></td><td>查找下一个单词 / 上一个单词</td></tr>
+<tr><td><kbd>F6</kbd></td><td>查找全部</td></tr>
+<tr><td><kbd>Ctrl+Shift+F</kbd></td><td>在文件中查找和替换</td></tr>
+<tr><td><kbd>Ctrl+Alt+F</kbd></td><td>迷你查找</td></tr>
+</table>
+<h4>选择</h4>
+<table>
+<tr><th>快捷键</th><th>命令</th></tr>
+<tr><td><kbd>Ctrl+A</kbd></td><td>全选</td></tr>
+<tr><td><kbd>Alt+W</kbd></td><td>选择当前单词</td></tr>
+<tr><td><kbd>Shift+←→↑↓</kbd></td><td>字符级扩展选区</td></tr>
+<tr><td><kbd>Shift+Home</kbd> / <kbd>Shift+End</kbd></td><td>选择到行头 / 行尾</td></tr>
+<tr><td><kbd>Ctrl+Shift+Home</kbd> / <kbd>Ctrl+Shift+End</kbd></td><td>选择到文件起始 / 结束</td></tr>
+<tr><td><kbd>Ctrl+Shift+←→</kbd></td><td>按词扩展选区</td></tr>
+<tr><td><kbd>Shift+PageUp</kbd> / <kbd>Shift+PageDown</kbd></td><td>向上 / 向下选择一页</td></tr>
+<tr><td><kbd>Alt+Shift+↑↓</kbd></td><td>选择到上一行 / 下一行同列</td></tr>
+<tr><td><kbd>Ctrl+Shift+]</kbd> / <kbd>Ctrl+Shift+[</kbd></td><td>选择到匹配括号(不含 / 含括号本身)</td></tr>
+<tr><td><kbd>Ctrl+]</kbd></td><td>括号匹配(移动到配对括号)</td></tr>
+<tr><td><kbd>Ctrl+`</kbd></td><td>跳转到下一个配对字符</td></tr>
+<tr><td><kbd>Ctrl+Shift+L</kbd></td><td>打散选区到每一行</td></tr>
+<tr><td><kbd>Alt+F3</kbd></td><td>选择所有匹配</td></tr>
+<tr><td><kbd>Ctrl+D</kbd></td><td>快速选择(添加下一处)</td></tr>
+<tr><td><kbd>Alt+Shift+U/H/K/J</kbd></td><td>向上 / 向左 / 向右 / 向下列择</td></tr>
+</table>
+<h4>光标移动</h4>
+<table>
+<tr><th>快捷键</th><th>命令</th></tr>
+<tr><td><kbd>Home</kbd> / <kbd>End</kbd></td><td>移动到子行头 / 子行尾</td></tr>
+<tr><td><kbd>Ctrl+Home</kbd> / <kbd>Ctrl+End</kbd></td><td>文档开始 / 结束</td></tr>
+<tr><td><kbd>Ctrl+←→</kbd></td><td>上 / 下一个单词</td></tr>
+<tr><td><kbd>PageUp</kbd> / <kbd>PageDown</kbd></td><td>翻页</td></tr>
+<tr><td><kbd>Ctrl+↑</kbd> / <kbd>Ctrl+↓</kbd></td><td>不移动光标滚动屏幕</td></tr>
+<tr><td><kbd>Ctrl+\</kbd> / <kbd>Ctrl+Shift+\</kbd></td><td>上一个 / 下一个光标位置</td></tr>
+<tr><td><kbd>Ctrl+G</kbd></td><td>跳转到行</td></tr>
+<tr><td><kbd>Ctrl+P</kbd></td><td>跳转到文件(「跳转」对话框)</td></tr>
+<tr><td><kbd>Ctrl+F12</kbd></td><td>跳转到文件符号(对话框预置 @)</td></tr>
+</table>
+<h4>书签与折叠</h4>
+<table>
+<tr><th>快捷键</th><th>命令</th></tr>
+<tr><td><kbd>Ctrl+F2</kbd> / <kbd>F2</kbd> / <kbd>Shift+F2</kbd></td><td>切换书签 / 下一个 / 上一个</td></tr>
+<tr><td><kbd>Ctrl+K</kbd>,<kbd>Ctrl+[</kbd> / <kbd>Ctrl+K</kbd>,<kbd>Ctrl+]</kbd></td><td>折叠 / 展开当前级别</td></tr>
+<tr><td><kbd>Ctrl+K</kbd>,<kbd>Ctrl+1</kbd> / <kbd>Ctrl+K</kbd>,<kbd>Ctrl+J</kbd></td><td>折叠全部 / 展开全部</td></tr>
+<tr><td><kbd>Ctrl+K</kbd>,<kbd>Ctrl+2…9</kbd></td><td>折叠级别 2–9</td></tr>
+</table>
+<h4>视图、窗口与面板</h4>
+<table>
+<tr><th>快捷键</th><th>命令</th></tr>
+<tr><td><kbd>Ctrl+加号</kbd>(<kbd>Ctrl+Shift+-</kbd> / <kbd>Ctrl+小键盘+</kbd>)/ <kbd>Ctrl+减号</kbd></td><td>增大 / 减小字号</td></tr>
+<tr><td><kbd>Ctrl+0</kbd></td><td>默认字号</td></tr>
+<tr><td><kbd>F11</kbd></td><td>全屏模式</td></tr>
+<tr><td><kbd>Ctrl+Tab</kbd> / <kbd>Ctrl+Shift+Tab</kbd></td><td>下一个 / 上一个文档</td></tr>
+<tr><td><kbd>F12</kbd></td><td>最近的窗口</td></tr>
+<tr><td><kbd>F7</kbd></td><td>显示/隐藏所有面板</td></tr>
+<tr><td><kbd>Alt+\</kbd></td><td>切换焦点</td></tr>
+<tr><td><kbd>Ctrl+K</kbd>,<kbd>D</kbd>(或 <kbd>Ctrl+Shift+D</kbd>)</td><td>快捷目录</td></tr>
+<tr><td><kbd>Ctrl+K</kbd>,<kbd>M</kbd> / <kbd>Ctrl+K</kbd>,<kbd>O</kbd></td><td>目录树 / 文件列表</td></tr>
+<tr><td><kbd>Ctrl+K</kbd>,<kbd>U</kbd> / <kbd>Ctrl+K</kbd>,<kbd>S</kbd> / <kbd>Ctrl+K</kbd>,<kbd>B</kbd></td><td>大纲视图 / 代码片段 / 书签管理器</td></tr>
+<tr><td><kbd>Ctrl+K</kbd>,<kbd>R</kbd> / <kbd>Ctrl+K</kbd>,<kbd>F</kbd></td><td>阅览模式 / 写作模式</td></tr>
+</table>
+<h4>插入与工具</h4>
+<table>
+<tr><th>快捷键</th><th>命令</th></tr>
+<tr><td><kbd>Ctrl+'</kbd></td><td>插入当前日期</td></tr>
+<tr><td><kbd>F9</kbd> / <kbd>Shift+F9</kbd> / <kbd>Ctrl+F9</kbd></td><td>升序排序 / 降序排序 / 高级排序</td></tr>
+<tr><td><kbd>F1</kbd></td><td>在线帮助</td></tr>
+<tr><td><kbd>Ctrl+Space</kbd> / <kbd>Ctrl+Shift+Space</kbd></td><td>补全候选 / 签名帮助(LSP,见第 13 章)</td></tr>
+<tr><td><kbd>Ctrl+Shift+M</kbd> / <kbd>Ctrl+Shift+P</kbd></td><td>宏录制/停止 / 宏回放</td></tr>
+</table>
+<div class="box note"><b>两条保留但不生效的默认绑定</b><br>
+<kbd>Ctrl+B</kbd>(Web预览,无内置浏览器)与 <kbd>Ctrl+K</kbd>,<kbd>C</kbd>(命令窗口,无该面板)——绑定行保留在 <code>key.ini</code> 里,按下后无动作,可在快捷键管理器里重新分配。</div>
+
+<h3>24.2 key.ini 格式</h3>
+<pre><code>[Shortcut]
+; 注释必须整行以分号开头;不支持行内注释
+C+N=cm_file_new            ; 修饰键 C=Ctrl S=Shift A=Alt,可连写:CS+F
+Down=cm_move_down          ; 允许无修饰键的裸键
+C+K,R=cm_macro_record      ; 二段式组合(和弦),最多两段
+C+F3=cm_find_nextword      ; 键名:字母/数字/标点直接写;F1..F24、Up、Down、
+                           ; Home、End、PageUp(Prior)、PageDown(Next)、
+                           ; Ins、Del、Backspace、Enter(Return)、Tab、
+                           ; Esc、Space、Equal、Comma、Minus、小键盘 Mul/Add/Sub/Div…</code></pre>
+<ul>
+<li>节名只认 <code>[Shortcut]</code>(不区分大小写);值是 <code>cm_*</code> 内部命令名,或一个脚本路径(<code>.mac</code>/<code>.macro</code> 或含 <code>\</code>/<code>/</code> 的路径)。</li>
+<li>无法识别的值:行保留(管理器仍显示)但不绑定动作;文件必须 <b>UTF-8</b>。</li>
+<li>同一组合写两行时后一行覆盖前一行。</li>
+<li>程序写回时只重写 <code>[Shortcut]</code> 节;首次保存在 exe 旁创建用户副本。</li>
+</ul>
+
+<h3>24.3 快捷键管理器</h3>
+<p>「工具」→「设置」→「快捷键」打开「快捷键管理」(无模式、可缩放):</p>
+<ul>
+<li>顶部过滤框实时过滤(ID/命令/说明);列表四列「按键 / ID / 命令 / 说明」,按命令名排序,未实现的命令灰显且不可绑定。</li>
+<li>选中命令:「当前快捷键」框列出它现有的全部组合;「新建快捷键」两个捕获框(按组合即填入,第一格填完自动跳第二格,适合录和弦);「分配」提交,「删除」移除。</li>
+<li>分配冲突时提示「这个快捷键已经被分配给:[…],需要把它删除吗?」。</li>
+<li>「绑定脚本」选择 <code>.mac</code>/<code>.macro</code>(默认目录 <code>&lt;exe&gt;\macro</code>);也可以直接把脚本文件<b>拖进列表</b>。</li>
+<li>每次改动立即写回 <code>key.ini</code> 并热重载,无需重启。</li>
+</ul>
+</section>
+
+<!-- ==================== 25 命令行 ==================== -->
+<section class="chapter" id="cli">
+<h2>25 命令行参考</h2>
+<table>
+<tr><th>参数</th><th>行为</th></tr>
+<tr><td><code>dogedit.exe [文件...]</code></td><td>打开指定文件(会话恢复之后最后打开);命中 <code>[HEX] Ext</code> 的进十六进制视图</td></tr>
+<tr><td><code>--selftest</code></td><td>不开窗,跑编辑器核心自检,输出 <code>selftest: OK</code> / <code>selftest: FAILED</code>(退出码 0/1)</td></tr>
+<tr><td><code>--ui-lint &lt;脚本.lua&gt;</code></td><td>不开窗,离线体检一个绘制脚本(跑每个画法并报账)</td></tr>
+<tr><td><code>--ui-doctor</code></td><td>不开窗,把脚本包真装一遍并检查全部主题,输出诊断报告;错误退出码 1</td></tr>
+<tr><td><code>--strict</code></td><td>配合 <code>--ui-doctor</code>:提醒也按错误计</td></tr>
+<tr><td><code>--packages</code></td><td>不开窗,打印脚本包清单报告(id/版本/脚本/状态/来源/目录)</td></tr>
+<tr><td><code>--safe-mode</code></td><td>开窗的安全模式:脚本一条不跑、外部主题覆盖不生效、关闭两条热重载轮询;不写任何配置</td></tr>
+<tr><td><code>--skin-debug</code></td><td>开窗,绘制纯度检查(每个回调跑两遍比对;退出报总账)</td></tr>
+<tr><td><code>--paint-stats</code></td><td>开窗,绘制计时统计(环境变量 <code>DOGEDIT_PAINT_STATS</code> 等价)</td></tr>
+</table>
+<p>启动流程要点:先读语言表 → Per-Monitor DPI 感知 → 装载脚本包(注册命令才有资格进菜单)→ 按上次退出记录摆窗 → 恢复状态栏次序、备份定时器、皮肤/主题热重载 → 备份恢复询问(如有)→ 会话恢复 → 打开命令行文件。其余 <code>--</code> 参数静默忽略。</p>
+<p>程序无单实例限制;窗口位置存 <code>[Window] Rect/Zoomed</code>。</p>
+</section>
+
+<!-- ==================== 26 数据文件 ==================== -->
+<section class="chapter" id="datafiles">
+<h2>26 数据文件参考</h2>
+
+<h3>26.1 查找与写回规则</h3>
+<table>
+<tr><th>文件</th><th>查找顺序</th><th>写回</th></tr>
+<tr><td><code>setting.ini</code></td><td>exe 目录 → 工作目录</td><td>写到读到的那个文件;文件不存在时不写(「选项」对话框确定时例外:写 exe 旁,可新建)</td></tr>
+<tr><td><code>key.ini</code></td><td>exe 目录 → 工作目录 → 内置默认</td><td>exe 目录(首次保存创建)</td></tr>
+<tr><td><code>template.ini</code> + <code>template\</code></td><td>exe 目录 → 工作目录</td><td>原位</td></tr>
+<tr><td><code>history.ini</code></td><td>exe 目录</td><td>原位</td></tr>
+<tr><td><code>*.session</code></td><td>exe 目录</td><td>原位</td></tr>
+<tr><td>主题 <code>themes\&lt;名&gt;.ini</code></td><td>exe 目录 → 工作目录</td><td>exe 旁(首次编辑时把内置文本复制出来)</td></tr>
+<tr><td>语言表 <code>lang\*.lng</code></td><td>内建 zh-CN/en-US 按系统 UI 语言,外置文件优先</td><td>—</td></tr>
+<tr><td>解析器 <code>parsers\</code></td><td>exe 目录 → 工作目录 → <code>%APPDATA%\dogedit\parsers</code></td><td>—</td></tr>
+<tr><td>脚本包 <code>packages\</code></td><td>exe 目录 → <code>%LOCALAPPDATA%\DogEdit\packages</code> → 工作目录</td><td>—</td></tr>
+</table>
+<div class="box note"><b>编码细节</b><br>
+<code>setting.ini</code> 读 UTF-16LE(带 BOM)或 UTF-8(容忍 BOM),写回保持原编码与其它行;段名不区分大小写,<b>键名区分大小写</b>;空值(如 <code>Disabled=</code>)与「没写这行」等价。<code>key.ini</code> 只认 UTF-8。</div>
+
+<h3>26.2 setting.ini 分节速查</h3>
+<table>
+<tr><th>节</th><th>主要键</th></tr>
+<tr><td><code>[Edit]</code></td><td>编辑器行为与外观开关:LineNumber、Ruler、ActiveLine、IndentLine、FoldingMethod(0 取消/1 语法/2 缩进)、FoldingStyle、AutoComplete、AutoIndent、AutoPair、WrapMode、NoHeadChars、NoTailChars、FullWidthPair、UrlHighlight、InvisibleCharInSel、ReadOnly、CaretStyle、CaretEffect、LineState、BookmarkStyle、ActiveLineStyle、SpaceStyle、TabStyle、MiniMapStyle、IndentStyle、MiniMap、BoundaryLine、KeepHighlight、QuickCase、QuickSmart、MaxSelHighlight、LexMax 等</td></tr>
+<tr><td><code>[Setting]</code></td><td>全局:Language、ToolBar、StatusBar、UIFont、RecentDoc、AutoDetectBuffer、DefaultFileFormat、DefaultEncoding、AutoWrapMax、MonitorFile、NewFileOnStartup、ANSI2UTF8、DarkTheme、DarkEditTheme、LightEditTheme、EditTheme、IconTheme、SBPane、IconSize、AutoUpdate 等</td></tr>
+<tr><td><code>[Tab]</code></td><td>标签栏:Position、ShowIcon、ShowMark、FixedWidth(Val)、Style、DockStyle、ActiveBG、HideOnlyOne、TabBar、FileList、ItemClose、DbclkClose、Scroll、DockTop</td></tr>
+<tr><td><code>[ToolBar]</code></td><td>Count + ToolBar(每 id 8 位十六进制小端,0 = 分隔线)</td></tr>
+<tr><td><code>[Print]</code></td><td>Margin(5 段十六进制)、MirrorFont、Header、Footer(<code>$(FileName)</code> <code>$(Date)</code> <code>$(Time)</code> <code>$(CurPage)</code> <code>$(TotalPage)</code> 等 token)</td></tr>
+<tr><td><code>[HEX]</code></td><td>Ext(自动进十六进制的扩展名)、Grouping</td></tr>
+<tr><td><code>[Font0]</code></td><td>字体方案槽:Font、UseCJK、Base0、Base1</td></tr>
+<tr><td><code>[Session]</code></td><td>File、Cursor、Marker、SaveModified、TempFolder</td></tr>
+<tr><td><code>[WordComplete]</code></td><td>Selected、WordTrigger、FuzzyMatch</td></tr>
+<tr><td><code>[Encoding]</code></td><td>Count、Encodings(编码对话框收藏)</td></tr>
+<tr><td><code>[Download]</code></td><td>Registry(空=内置远端;http(s)=远端;其它=本地镜像目录)、Dismissed、AutoQuery</td></tr>
+<tr><td><code>[Window]</code></td><td>Rect、Zoomed</td></tr>
+<tr><td><code>[FolderView]</code></td><td>Last、DirView(快捷目录清单,竖线分隔)</td></tr>
+<tr><td><code>[Browser]</code></td><td>Current、Other(外部浏览器)</td></tr>
+<tr><td><code>[Proxy]</code></td><td>Type、Host、Port、User、Pwd</td></tr>
+<tr><td><code>[Notify]</code></td><td>FlashTaskbar、TaskbarProgress、Sound、SoundFile(成功)、FailSoundFile(失败)</td></tr>
+<tr><td><code>[DockWindow]</code></td><td>Theme</td></tr>
+<tr><td><code>[Lsp]</code></td><td>Enable(N = 完全停用)</td></tr>
+<tr><td><code>[Ctags]</code></td><td>Enabled(默认关)、Dir、Extensions(默认 <code>.c .h .cpp .hpp .cc .cxx .java .cs .php .py .rb .pl .lua</code>;单次扫描上限 5 万标签)</td></tr>
+<tr><td><code>[Syntax]</code></td><td>Disabled(停用解析器包名,逗号分隔)、Default</td></tr>
+<tr><td><code>[Scripts]</code></td><td>Disabled(停用脚本包 id)</td></tr>
+<tr><td><code>[DateTime]</code></td><td>Date、Time(自定义格式串)</td></tr>
+<tr><td><code>[Save]</code></td><td>AutoBackup、AutoSaveTime、BigFile、BackupVersions、KeepDays、BudgetMB、SpecialDir、Dir</td></tr>
+</table>
+
+<h3>26.3 template.ini</h3>
+<pre><code>[Temp]
+Count=5
+UseTempFormat=N        ; Y = 新文档沿用模板文件自己的编码与换行符
+[Temp0]
+Title=HTML
+Type=HTML              ; 语法类型(包显示名/语法名/扩展名)
+File=template.htm      ; 相对 = ini 旁 template\ 下;空 = 不插入内容
+Snippet=Y              ; 内容经片段引擎展开(${n:…} / $0),限 4KB</code></pre>
+
+<h3>26.4 history.ini 与会话</h3>
+<ul>
+<li><code>history.ini</code>(exe 旁):<code>[RecentDoc]</code>(最近文件,条目含关闭时行列)、<code>[Session]</code>(命名会话名单)、<code>[Grep]</code>(查找对话框的全部选项与 5 组 MRU,各 20 条)。</li>
+<li><code>*.session</code>(exe 旁):每个文档一节,含 Path/Type/EOL/BOM/Encoding/Cursor/Order。</li>
+<li>会话状态目录(<code>[Session] TempFolder</code>,默认 <code>%LOCALAPPDATA%\DogEdit\session</code>):<code>session.ini</code>(标签清单+光标+书签)、<code>hot\*.dgab</code> + <code>hot\*.ini</code>(热保存正文与元数据)。</li>
+<li>备份根(<code>%LOCALAPPDATA%\DogEdit\backup</code> 或自定义):按源路径哈希分目录,<code>vNNNN.dgab/.ini</code> + <code>doc.ini</code>。</li>
+<li>解析器缓存:<code>%LOCALAPPDATA%\DogEdit\parsercache.json</code>(列表 + ETag + 30 天负缓存)。</li>
+</ul>
+
+<h3>26.5 lang/*.lng</h3>
+<p>INI 格式的语言表,四类小节:<code>[Info]</code>(Author/Home/Reviewer)、<code>[MENUxxx]</code>(菜单文案,键=命令 id;子菜单标题用 <code>P&lt;id&gt;</code> 键;快捷键列用 Tab 分隔)、<code>[DLGxxx]</code>(对话框文案,键=控件 id,0=标题)、<code>[STRING]</code>(散字符串)。磁盘文件优先于内建表——放一份新 <code>.lng</code> 就是新语言;修改文案需重启生效。</p>
+</section>
+
+<!-- ==================== 27 限制 ==================== -->
+<section class="chapter" id="limits">
+<h2>27 当前版本尚未提供的功能</h2>
+<p>以下功能在界面上可见(菜单行/按钮存在)但当前未实现,点击无效或显示为灰色;汇总于此,便于对照:</p>
+<table>
+<tr><th>类别</th><th>未提供项</th></tr>
+<tr><td>窗口</td><td>垂直/水平分割、克隆视图、同步滚动、窗口分组(移动到垂直/水平分组、合并分组)、窗口透明度(80%…10%/自定义)</td></tr>
+<tr><td>标签</td><td>标签拖拽重排</td></tr>
+<tr><td>文档</td><td>竖排书写模式、批量转码・换行符、自动纠正关键字大小写、监视该文件变更子菜单(全局监视选项仍可用)、重新加载模式</td></tr>
+<tr><td>查找</td><td>批量替换;快速选择的「大小写匹配/智能匹配单词边界」两行(其配置项服务于选区高亮)</td></tr>
+<tr><td>LSP</td><td>重命名与查找引用的默认键位(被全局快捷键占用);LSP 格式化;按语言自定义服务器</td></tr>
+<tr><td>编辑</td><td>复制为RTF、使用虚拟空格、使用软空格、显示函数提示、插入颜文字、设置行高、Base64 的「指定编码」两条</td></tr>
+<tr><td>工具</td><td>文件比较(内置/外部)、序列、取色器、加密/解密、拼写检查(全部子项)、Web预览(内置;「外部浏览器预览」可用)、「捕获到Web预览」动作模式</td></tr>
+<tr><td>扩展</td><td>扩展管理器、从本地文件安装扩展、保存为脚本、宏编辑、FTP/SFTP、Git 面板、收藏夹与命令窗口两个面板</td></tr>
+<tr><td>帮助</td><td>检查更新、报告错误、快捷键列表、关联帮助、清除注册信息、打开安装目录、关于(仅「在线帮助」可用)</td></tr>
+<tr><td>打印</td><td>打印与打印预览(选项 → 打印页可先配置)</td></tr>
+<tr><td>设置</td><td>「允许多个实例同时运行」开关、「当文件小于?(MB)时直接用内存打开」(大文件阈值内置 50 MB)、撤销深度无设置页(固定 1000 步)</td></tr>
+<tr><td>正则</td><td>环视断言 <code>(?=) (?!) (?&lt;=) (?&lt;!)</code> 与 <code>\c \j \J \P</code> 预设记号(引擎不支持,写出不产生匹配)</td></tr>
+<tr><td>HEX</td><td>跳转到偏移、字节搜索</td></tr>
+<tr><td>Lua 事件</td><td>仅 <code>doc.saved</code> / <code>doc.opened</code> 有触发点;其余事件名可注册但不触发</td></tr>
+</table>
+</section>
+
+<!-- ==================== 28 FAQ ==================== -->
+<section class="chapter" id="faq">
+<h2>28 常见问题</h2>
+
+<h4>Q:打开代码文件没有语法高亮?</h4>
+<p>语法不随二进制分发。到「工具 → 设置 → 解析器下载」装对应解析器,或按 11.3 的三种离线方式安装;装完新打开的文件立即生效,已打开的文件可「文档 → 高级 → 重新加载着色」或重开。</p>
+
+<h4>Q:改了设置(主题、深色模式)为什么没生效?</h4>
+<p>深色主题与界面语言都需要重启;其余界面选项「应用」即生效。另外确认 <code>setting.ini</code> 存在——文件不存在时所有写盘都会放弃。</p>
+
+<h4>Q:配置文件在哪?为什么没有生成?</h4>
+<p>全部在 exe 旁边(setting.ini / key.ini / history.ini / *.session / themes\ / lang\ / template.ini),不在 %APPDATA%——这是便携式设计。<code>setting.ini</code> 缺失时程序不会替你创建(「选项」对话框确定时除外),手工新建一个只含 <code>[Setting]</code> 的文件即可。</p>
+
+<h4>Q:快捷键被占用/想改成别的键?</h4>
+<p>「工具 → 设置 → 快捷键」;冲突时程序会询问是否把旧绑定让出来。手工编辑 <code>key.ini</code> 也行(UTF-8、<code>[Shortcut]</code> 节、<code>C/S/A+键=命令名</code>、和弦用逗号)。</p>
+
+<h4>Q:误删/误改了文件内容,能找回吗?</h4>
+<p>两条路:①「文件 → 备份与历史」按版本恢复(需开启自动备份);②会话热保存(选项 → 会话页开启「记忆/恢复被修改的文件的内容」)保存退出前未落盘的内容。文件没保存就崩溃时,下次启动会自动弹恢复询问。</p>
+
+<h4>Q:大文件打开很慢/卡?</h4>
+<p>超过 50 MB 自动走大文件模式(秒开、不整体载入)。注意该模式下折叠、自动换行、LSP、自动完成、查找条全部替换不可用;替换用右键「替换结果导出」,日志场景用「尾随日志」。</p>
+
+<h4>Q:正则 <code>(?=…)</code> 为什么匹配不到东西?</h4>
+<p>正则引擎是 RE2 风格,不支持环视/后行断言(见 6.2 的警告框)。变通:用「查找全部」后手工筛选,或分两步查找。</p>
+
+<h4>Q:LSP 不工作?</h4>
+<p>当前只对 Rust 与 JSON 起 <code>rust-analyzer</code>,且要求它在 PATH 上;可用 <code>[Lsp] Enable=N</code> 关闭。补全用 <kbd>Ctrl+Space</kbd> 手动触发。</p>
+
+<h4>Q:如何离线安装解析器?</h4>
+<p>三种方式任选(11.3):从文件安装 zip、配置本地镜像目录、或把包目录拷进 <code>parsers\</code> 搜索根。</p>
+
+<h4>Q:怎么把界面换成英文/其它语言?</h4>
+<p>「选项 → 语言」选 <code>en-US</code>(或放一个新 <code>.lng</code>),重启生效。语言表本身也是可编辑的文本文件(26.5)。</p>
+
+<h4>Q:如何为新文件配置默认编码/换行符?</h4>
+<p>「选项 → 文件」页:「格式」(CRLF/LF/CR)与「编码」(ANSI/UTF-8/UTF-8+BOM/UTF-16/GBK/Shift-JIS)。</p>
+
+<h4>Q:启动时想直接回到上次的工作现场?</h4>
+<p>「选项 → 会话」页勾选「启动时恢复上次退出前未关闭的文件」;需要连未保存内容一起恢复就再勾「热保存」。或者用「文件 → 会话」的命名会话手工管理。</p>
+</section>
+
+<!-- ==================== 29 附录 ==================== -->
+<section class="chapter" id="appendix">
+<h2>29 附录</h2>
+
+<h3>29.1 主题文件结构(themes/&lt;名称&gt;.ini)</h3>
+<pre><code>[Theme]      颜色:Default/Selection/LineNumber/Found/Comment1/Comment2/
+             String1/String2/Number/Word1..4/Function/Var/Operator/
+             Highlight1..8/ActiveLine/Caret/...  每键=颜色;
+             字形后缀(粗体/斜体/下划线等)由「主题」对话框写入
+[Metrics]    几何:status.height、status.pad、tab.height、menu.height、...
+[Fonts]      字体槽:mono.face / mono.size / ui.face / tab.face / ...
+[Shape]      形状:tab.states.active.radius 之类(仅已接线区域生效)</code></pre>
+<p>主题按背景亮度自动判定深浅;文件热重载。在「主题」对话框里改任何一格,底部状态行都会显示写入了哪个键——照抄到自己的主题文件即可。</p>
+
+<h3>29.2 解析器 manifest.toml 示例</h3>
+<pre><code>name = "lua"
+display = "Lua"
+version = "0.1.0"
+entry = "tree_sitter_lua"
+dll = "lua.dll"
+extensions = ["lua"]
+filenames = []
+first_lines = ["#!/usr/bin/env lua"]
+abi = [13, 15]
+max_file_bytes = 4194304</code></pre>
+
+<h3>29.3 脚本包 package.toml 示例</h3>
+<pre><code>api = 1
+id = "luapaint"
+name = "LuaPaint"
+version = "1.0.0"
+description = "状态栏与页签的示例脚本包"
+order = 90
+requires = ["dogedit &gt;= 0.9"]
+# launch = "贪吃蛇(&amp;S)"   # 写了就是按需启动:开机不跑,点菜单才开
+scripts = ["paint.lua", "panels.lua"]</code></pre>
+
+<h3>29.4 外部工具输出定位示例</h3>
+<p>让编译器输出可以双击跳转:动作模式选「捕获输出」,「高级」里勾「使用输出定位」,正则写 <code>^(.+)\((\d+),(\d+)\):</code>,捕获下拉把「文件路径=捕获 1、行号=捕获 2、列号=捕获 3」;输出窗口的「下一个/上一个结果」即可按格式打开文件行列。</p>
+
+<h3>29.5 诊断与自检速查</h3>
+<table>
+<tr><th>命令</th><th>用途</th></tr>
+<tr><td><code>dogedit --selftest</code></td><td>编辑核心自检</td></tr>
+<tr><td><code>dogedit --packages</code></td><td>脚本包清单报告(只看清单)</td></tr>
+<tr><td><code>dogedit --ui-doctor [--strict]</code></td><td>包装载体检 + 主题全量检查(可作 CI 闸门)</td></tr>
+<tr><td><code>dogedit --ui-lint x.lua</code></td><td>单个绘制脚本离线体检</td></tr>
+<tr><td><code>dogedit --skin-debug</code></td><td>绘制纯度检查(副作用/缓存命中)</td></tr>
+<tr><td><code>dogedit --paint-stats</code></td><td>绘制计时统计</td></tr>
+<tr><td>「查看 → 高级 → 重新扫描解析器」</td><td>解析器清单与诊断写入输出窗格</td></tr>
+</table>
+
+<h3>29.6 手册信息</h3>
+<p>本手册依据 DogEdit 公开源码树整理(界面文案逐字引自源码与语言表),对应开发中版本;功能与行为以实际程序为准。发现文档与程序不一致时,欢迎按仓库贡献流程反馈修正。</p>
+</section>
+
+</main>
+</div>
+<script>
+(function(){
+  var input=document.getElementById('tocsearch');
+  if(!input)return;
+  input.addEventListener('input',function(){
+    var q=input.value.trim().toLowerCase();
+    document.querySelectorAll('#toc a').forEach(function(a){
+      var hit=!q||a.textContent.toLowerCase().indexOf(q)>=0;
+      a.parentElement.classList.toggle('dim',!hit);
+    });
+    document.querySelectorAll('#toc>ol>li').forEach(function(li){
+      var any=li.querySelectorAll('a:not(.dim) .x, a');
+      var visible=false;
+      li.querySelectorAll('a').forEach(function(a){if(!a.parentElement.classList.contains('dim'))visible=true;});
+      li.classList.toggle('dim',!visible);
+    });
+  });
+})();
+
+(function(){
+  var KEY='dg-manual-theme';
+  var btn=document.getElementById('themebtn');
+  if(!btn)return;
+  var MODES=['auto','light','dark'];
+  var LABEL={auto:'◐ 主题:跟随系统',light:'☀ 主题:浅色',dark:'☾ 主题:深色'};
+  var cur=document.documentElement.getAttribute('data-theme')||'auto';
+  if(MODES.indexOf(cur)<0)cur='auto';
+  function apply(){
+    document.documentElement.setAttribute('data-theme',cur);
+    btn.textContent=LABEL[cur];
+    try{localStorage.setItem(KEY,cur);}catch(e){}
+  }
+  btn.addEventListener('click',function(){
+    cur=MODES[(MODES.indexOf(cur)+1)%MODES.length];
+    apply();
+  });
+  apply();
+})();
+</script>
+</body>
+</html>

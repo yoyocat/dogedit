@@ -1,0 +1,7 @@
+name = "lua"
+display = "Lua"
+version = "0.1.0"
+extensions = ["lua"]
+# 无扩展名的脚本（`bin/run` 里写着 `#!/usr/bin/env lua`）按首行前缀认
+first_lines = ["#!/usr/bin/env lua", "#!/usr/bin/lua"]
+abi = [13, 15]

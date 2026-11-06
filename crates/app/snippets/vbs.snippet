@@ -1,0 +1,23 @@
+#title=VBScript
+
+#t=Message box
+#g=msgbox
+MsgBox "${1:text}"
+
+#t=Subroutine
+#g=sub
+Sub ${1:Name}(${2:args})
+	${0}
+End Sub
+
+#t=For loop
+#g=for
+For ${1:i} = ${2:1} To ${3:n}
+	${0}
+Next
+
+#t=If
+#g=if
+If ${1:condition} Then
+	${0}
+End If

@@ -1,0 +1,1132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>DogEdit 脚本使用与 API 参考</title>
+<style>
+:root{
+  --bg:#ffffff; --bg2:#f6f8fa; --fg:#1f2328; --fg2:#57606a;
+  --acc:#0969da; --acc2:#ddf4ff; --bd:#d0d7de; --code:#f6f8fa;
+  --kbd:#eaeef2; --note:#fff8c5; --notebd:#d4a72c;
+  --warn:#ffebe9; --warnbd:#cf222e; --ok:#dafbe1; --okbd:#1a7f37;
+  --todo:#f1f8ff; --zebra:rgba(0,0,0,.015);
+  --expbg:#fff1e5; --expfg:#953800; --expbd:#f0883e;
+  color-scheme:light;
+}
+:root[data-theme="dark"]{
+  --bg:#0d1117; --bg2:#161b22; --fg:#e6edf3; --fg2:#8b949e;
+  --acc:#58a6ff; --acc2:#1b3a5c; --bd:#30363d; --code:#161b22;
+  --kbd:#21262d; --note:#2f2712; --notebd:#d4a72c;
+  --warn:#34161a; --warnbd:#f85149; --ok:#122b1d; --okbd:#3fb950;
+  --todo:#0f2744; --zebra:rgba(255,255,255,.035);
+  --expbg:#3a1f0a; --expfg:#f0883e; --expbd:#f0883e;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: dark){
+  :root[data-theme="auto"]{
+    --bg:#0d1117; --bg2:#161b22; --fg:#e6edf3; --fg2:#8b949e;
+    --acc:#58a6ff; --acc2:#1b3a5c; --bd:#30363d; --code:#161b22;
+    --kbd:#21262d; --note:#2f2712; --notebd:#d4a72c;
+    --warn:#34161a; --warnbd:#f85149; --ok:#122b1d; --okbd:#3fb950;
+    --todo:#0f2744; --zebra:rgba(255,255,255,.035);
+    --expbg:#3a1f0a; --expfg:#f0883e; --expbd:#f0883e;
+    color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:24px}
+body{margin:0;font:15px/1.75 "Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;color:var(--fg);background:var(--bg)}
+a{color:var(--acc);text-decoration:none}
+a:hover{text-decoration:underline}
+#layout{display:flex;min-height:100vh}
+nav#toc{width:312px;flex:0 0 312px;position:sticky;top:0;height:100vh;overflow-y:auto;
+  border-right:1px solid var(--bd);background:var(--bg2);padding:18px 14px 40px}
+main{flex:1;min-width:0;padding:28px 40px 120px;max-width:980px}
+@media (max-width:1080px){
+  #layout{display:block}
+  nav#toc{position:static;width:auto;height:auto;flex:none;border-right:none;border-bottom:1px solid var(--bd)}
+  main{padding:20px 18px 80px}
+}
+#toc h1{font-size:17px;margin:2px 6px 10px}
+#toc h1 small{display:block;font-weight:400;color:var(--fg2);font-size:12px}
+#tocsearch{width:100%;padding:6px 9px;margin:0 0 10px;border:1px solid var(--bd);border-radius:6px;font:inherit;font-size:13px;background:var(--bg)}
+#themebtn{width:100%;padding:6px 9px;margin:0 0 10px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--fg);font:inherit;font-size:13px;cursor:pointer;text-align:left}
+#themebtn:hover{background:var(--acc2)}
+#toc ol{list-style:none;margin:0;padding:0}
+#toc>ol>li{margin-top:3px}
+#toc a{display:block;padding:4px 8px;border-radius:6px;color:var(--fg);font-size:13.5px;line-height:1.45}
+#toc a:hover{background:var(--acc2);text-decoration:none}
+#toc a.sub{padding-left:24px;color:var(--fg2);font-size:12.5px}
+#toc .dim{display:none}
+h2{font-size:26px;margin:0 0 6px;padding-bottom:8px;border-bottom:2px solid var(--bd)}
+h3{font-size:19px;margin:34px 0 10px}
+h4{font-size:16px;margin:26px 0 8px}
+section.chapter{margin-bottom:64px}
+p{margin:8px 0}
+ul,ol{margin:8px 0;padding-left:26px}
+li{margin:3px 0}
+.lead{color:var(--fg2);margin:4px 0 18px}
+code{font-family:Consolas,"Cascadia Mono",monospace;font-size:.92em;background:var(--code);border:1px solid var(--bd);border-radius:4px;padding:1px 5px;white-space:nowrap}
+pre{background:var(--code);border:1px solid var(--bd);border-radius:8px;padding:12px 14px;overflow:auto;font-size:13px;line-height:1.55}
+pre code{background:none;border:none;padding:0;white-space:pre}
+kbd{font-family:Consolas,monospace;font-size:.85em;background:var(--kbd);border:1px solid var(--bd);border-bottom-width:2px;border-radius:5px;padding:1px 6px;white-space:nowrap;color:var(--fg)}
+table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13.5px}
+th,td{border:1px solid var(--bd);padding:6px 10px;text-align:left;vertical-align:top}
+th{background:var(--bg2);white-space:nowrap}
+tr:nth-child(even) td{background:var(--zebra)}
+.nowrap{white-space:nowrap}
+.sig{font-family:Consolas,monospace;font-size:13px;background:var(--code);border:1px solid var(--bd);border-radius:6px;padding:3px 10px;display:inline-block;margin:2px 0;white-space:nowrap}
+.box{border:1px solid var(--bd);border-left:4px solid var(--acc);border-radius:8px;padding:10px 14px;margin:14px 0;background:var(--todo)}
+.box.note{border-left-color:var(--notebd);background:var(--note)}
+.box.warn{border-left-color:var(--warnbd);background:var(--warn)}
+.box.ok{border-left-color:var(--okbd);background:var(--ok)}
+.box b:first-child{display:block;margin-bottom:2px}
+.badge{display:inline-block;font-size:11px;font-weight:600;border-radius:10px;padding:0 8px;vertical-align:1px;white-space:nowrap}
+.badge.na{background:var(--warn);color:var(--warnbd);border:1px solid var(--warnbd)}
+.badge.ok{background:var(--ok);color:var(--okbd);border:1px solid var(--okbd)}
+.badge.exp{background:var(--expbg);color:var(--expfg);border:1px solid var(--expbd)}
+@media print{
+  nav#toc{display:none} main{max-width:none;padding:0}
+  section.chapter{page-break-before:always}
+  body{font-size:12px}
+  :root,:root[data-theme="auto"],:root[data-theme="dark"]{--bg:#fff;--bg2:#fff;--fg:#1f2328;--fg2:#57606a;--acc:#0969da;--acc2:#e8f2fd;--bd:#ccc;--code:#f6f8fa;--kbd:#eee;--note:#fff8c5;--notebd:#d4a72c;--warn:#ffebe9;--warnbd:#cf222e;--ok:#dafbe1;--okbd:#1a7f37;--todo:#f1f8ff;--zebra:rgba(0,0,0,.02);--expbg:#fff1e5;--expfg:#953800;--expbd:#f0883e;color-scheme:light}
+}
+</style>
+<script>(function(){try{document.documentElement.setAttribute('data-theme',localStorage.getItem('dg-manual-theme')||'auto');}catch(e){}})();</script>
+</head>
+<body>
+<div id="layout">
+<nav id="toc">
+<h1>DogEdit 脚本使用与 API 参考
+<small>适用于当前开发版 · 依据源码整理</small></h1>
+<button id="themebtn" type="button" title="循环切换:跟随系统 → 浅色 → 深色">◐ 主题:跟随系统</button>
+<input id="tocsearch" type="search" placeholder="筛选目录…" aria-label="筛选目录">
+<ol>
+<li><a href="#intro">1 前言</a></li>
+<li><a href="#quickstart">2 快速上手</a></li>
+<li><a href="#model">3 运行模型</a></li>
+<li><a href="#coords">4 坐标约定</a></li>
+<li><a href="#app">5 App 核心 API</a></li>
+<li><a href="#doc">6 文档、选择与视口</a></li>
+<li><a href="#events">7 事件、命令与快捷键</a></li>
+<li><a href="#storage">8 持久存储 App.storage</a></li>
+<li><a href="#skin">9 皮肤与 UI 总览</a></li>
+<li><a href="#paint">10 接管绘制 App.ui.paint</a></li>
+<li><a href="#canvas">11 画布 c 与上下文 ctx</a></li>
+<li><a href="#layout">12 声明元素 App.ui.layout</a></li>
+<li><a href="#press">13 点击与悬停</a></li>
+<li><a href="#style">14 运行时外观 App.ui.style</a></li>
+<li><a href="#packages">15 脚本包</a></li>
+<li><a href="#cli">16 命令行与诊断</a></li>
+<li><a href="#limits">17 沙箱与限制汇总</a></li>
+<li><a href="#recipes">18 示例集</a></li>
+</ol>
+</nav>
+<main>
+
+<!-- ==================== 1 前言 ==================== -->
+<section class="chapter" id="intro">
+<h2>1 前言</h2>
+<p class="lead">本文是 DogEdit 脚本系统的<b>完整参考</b>:Lua 沙箱的全部 API、坐标约定、皮肤绘制、脚本包格式与诊断工具。用户手册第 21 章是它的摘要。</p>
+
+<h3>1.1 覆盖范围</h3>
+<ul>
+<li><b>核心 API</b>:弹窗、日志、输入框、文档读写、选择、视口、事件、命令、快捷键、定时器、持久存储。</li>
+<li><b>UI API</b>:接管内置控件的绘制、声明自己的停靠窗格 / 状态栏段 / 工具栏按钮、运行时改外观。</li>
+<li><b>工程侧</b>:脚本与脚本包的目录、<code>package.toml</code> 清单、装载顺序、启停管理、命令行诊断。</li>
+</ul>
+<p>宏(录制 / 回放 <code>.mac</code>)与本文的 Lua 脚本是两套独立机制,见用户手册 <a href="user_manual.html#macro">21.1</a>。</p>
+
+<h3>1.2 版本约定</h3>
+<table>
+<tr><th>量</th><th>值</th><th>如何查询</th></tr>
+<tr><td>Lua 语言版本</td><td>5.4</td><td><code>_VERSION</code></td></tr>
+<tr><td>脚本 API 版本</td><td><code>"0.2"</code></td><td><code>App.version()</code></td></tr>
+<tr><td>包清单格式版本</td><td><code>api = 1</code>(唯一被接受的值)</td><td>—</td></tr>
+<tr><td>宿主版本</td><td>程序版本号(当前 0.1.0)</td><td><code>requires = ["dogedit &gt;= …"]</code> 拿它比</td></tr>
+</table>
+<p class="lead" style="margin-top:18px">所有行为均按当前开发版源码整理;尚未接线的功能在文中用 <span class="badge na">尚未触发</span> 一类徽标如实标注。</p>
+</section>
+
+<!-- ==================== 2 快速上手 ==================== -->
+<section class="chapter" id="quickstart">
+<h2>2 快速上手</h2>
+<p class="lead">脚本是 UTF-8 文本文件,写完放到约定目录就生效,不需要编译、不需要注册。</p>
+
+<h3>2.1 脚本放在哪里</h3>
+<table>
+<tr><th>位置</th><th>是什么</th><th>清单</th></tr>
+<tr><td><code>exe目录\packages\&lt;id&gt;\</code></td><td>随包发布的脚本包(只读)</td><td><code>package.toml</code></td></tr>
+<tr><td><code>%LOCALAPPDATA%\DogEdit\packages\&lt;id&gt;\</code></td><td>用户安装的脚本包</td><td><code>package.toml</code></td></tr>
+<tr><td><code>工作目录\packages\&lt;id&gt;\</code></td><td>开发中的脚本包(优先级最高,"正在改的那份赢")</td><td><code>package.toml</code></td></tr>
+<tr><td><code>exe目录\scripts\*.lua</code>、<code>工作目录\scripts\*.lua</code></td><td>散装脚本:免清单,包名 = 文件名</td><td>无</td></tr>
+</table>
+<div class="box note"><b>同名规则</b>同一个包 id 在多个根目录出现时,<b>后面的根覆盖前面的</b>(开发目录 &gt; 用户目录 &gt; 随包目录);被覆盖的那份在「脚本包」对话框里不单列。散装脚本的归属包名是空串。</div>
+
+<h3>2.2 第一个脚本</h3>
+<p>在 <code>exe目录\scripts\</code>(或工作目录的 <code>scripts\</code>)放一个 <code>hello.lua</code>:</p>
+<pre><code>-- 三个最基础的出口:弹窗、日志、版本号
+App.alert(("hello from %s (%s), doc %q has %d lines"):format(
+    App.version(), _VERSION, App.doc.name(), App.doc.line_count()))
+App.log("hello.lua finished")</code></pre>
+<p>启动 DogEdit 即装载。<code>App.alert</code> 弹一个消息框(标题 <b>DogEdit Lua</b>);<code>App.log</code> 与 <code>print</code> 落到 stderr(行前缀 <code>[lua] </code>)和调试输出(<code>OutputDebugString</code>,调试器里可见)。GUI 程序的 stdout 是空的,<code>print</code> 不会打印到任何控制台 —— 想看日志要么从终端启动,要么挂调试器。</p>
+<p>改一下 <code>hello.lua</code> 再保存:装载过的每个脚本文件都被一个 700 ms 的定时器盯着,<b>指纹(修改时间 + 长度)一变就自动重跑</b>,不用重启。语法错的版本不会顶掉正在工作的版本 —— 屏幕保持上一次成功的样子,错误打一行日志。</p>
+
+<h3>2.3 运行现成脚本的入口</h3>
+<ul>
+<li><code>App.command</code> 注册的命令出现在「扩展」菜单底部,形如 <b>Lua: 命令名</b>(见第 7 章);写了 <code>launch</code> 的按需包例外,它们只有一行菜单,内部命令不上菜单。</li>
+<li>脚本包默认随启动自动装载;「工具 → 设置 → 脚本包…」里可停用 / 启用(见第 15 章)。写了 <code>launch</code> 的按需包开机不跑,点「扩展」菜单那一行才启动(见 15.2)。</li>
+</ul>
+
+<h3>2.4 第二个脚本:读文档、改文档</h3>
+<p>示例脚本「去除行尾空白」全文如下 —— 它演示了遍历行、读行文本、按列区间替换这一整套核心 API:</p>
+<pre><code>local n = 0
+for i = 1, App.doc.line_count() do
+    local t = App.doc.line(i)
+    local keep = t:match("^(.*%S)") or ""
+    if #keep &lt; #t then
+        -- 列区间是 [start, end):末端用 #t+1 表示"行尾之后"。
+        App.doc.replace(i, #keep + 1, i, #t + 1, "")
+        n = n + 1
+    end
+end
+if n &gt; 0 then
+    App.log(("trim_trailing.lua: %d lines trimmed"):format(n))
+end
+return n</code></pre>
+<p>列坐标是 UTF-8 字节列(见第 4 章),<code>#</code> 和 <code>string.sub</code> 与它正好对齐,含中文的行也正确。脚本对文档的修改走与键盘输入相同的撤销通道。</p>
+</section>
+
+
+<!-- ==================== 3 运行模型 ==================== -->
+<section class="chapter" id="model">
+<h2>3 运行模型</h2>
+<p class="lead">一个进程一个<b>常驻 Lua 状态</b>:脚本装载一次,注册(命令、事件、快捷键、画法、定时器)存活整个生命周期。</p>
+
+<h3>3.1 两个执行档</h3>
+<p>每个回调都在下面两种档位之一里跑,差别是「能碰到什么」:</p>
+<table>
+<tr><th>档位</th><th>什么时候</th><th>能用的 API</th><th>不能</th></tr>
+<tr><td><b>意图档</b>(有 bridge)</td><td>事件、命令、定时器、点击、快捷键、启动装载</td><td>全部:<code>App.doc.*</code>、<code>App.sel.*</code>、<code>App.run</code>、<code>App.alert</code>、<code>App.taskbar</code>…</td><td>—</td></tr>
+<tr><td><b>绘制档</b>(无 bridge)</td><td>接管绘制的回调、状态栏 <code>update</code></td><td>画布 <code>c</code>、上下文 <code>ctx</code>、<code>App.now()</code>、<code>App.log</code>/<code>print</code>、<code>ctx.theme</code></td><td>碰不到文档(<code>App.doc.*</code> 一律报错)、跑不了命令、改不了状态、碰不到任务栏 —— 想做事就返回值</td></tr>
+</table>
+<div class="box"><b>为什么这样设计</b>绘制跑在 <code>WM_PAINT</code> 里,那时编辑器状态正被借用;重入轻则改坏文档,重则进程崩溃。绘制档不是「靠约定别乱来」,而是根本没给工具。绘制回调必须是<b>纯函数</b>:同样的输入画出同样的东西 —— 这也是绘制缓存的前提。</div>
+
+<h3>3.2 队列:回调里不直接执行的动作</h3>
+<p>回调执行期间编辑器状态被借走,所以三件事在回调里<b>只入队</b>,回调返回后由宿主统一派发:</p>
+<table>
+<tr><th>调用</th><th>入队的事</th><th>派发时机</th></tr>
+<tr><td><code>App.run(命令名)</code></td><td>跑一个命令(脚本命令优先,没有就落内置命令表)</td><td rowspan="3">本回调返回之后、bridge 还在的那个缝隙;每轮最多派发 256 件,超限整队丢弃并记日志</td></tr>
+<tr><td><code>App.defer(函数)</code></td><td>一个普通函数</td></tr>
+<tr><td><code>App.view.scroll_to(line, col)</code></td><td>滚动视口</td></tr>
+</table>
+<p>嵌套调用自然接到队尾:命令 A 里再 <code>App.run("b")</code>,b 会在 A 返回后跑。<code>App.pending()</code> 返回还排着几件,给脚本自己诊断用。</p>
+
+<h3>3.3 预算与限额</h3>
+<table>
+<tr><th>约束</th><th>值</th><th>超了会怎样</th></tr>
+<tr><td>Lua 堆内存</td><td>64 MB</td><td>抛 <code>not enough memory</code>,按普通错误处理</td></tr>
+<tr><td>绘制回调 / 状态栏 <code>update</code> 指令数</td><td>20 万条</td><td rowspan="2">抛 <code>script exceeded its instruction budget (N instructions)</code>;绘制回调报错 → 交回内置画法,其余 → 记日志</td></tr>
+<tr><td>事件 / 命令 / 定时器 / 装载 指令数</td><td>2000 万条</td></tr>
+<tr><td>同时存活的定时器</td><td>64 个</td><td>登记被拒:<code>too many timers (max 64)</code></td></tr>
+<tr><td>一轮定时器派发</td><td>最多 64 发</td><td>多出来的留到下一跳</td></tr>
+<tr><td>待办队列</td><td>256 件</td><td>入队超限静默丢弃计数;派发超限整队丢掉</td></tr>
+</table>
+<div class="box note"><b>为什么按指令数掐</b>沙箱挡得住 <code>io</code>/<code>os</code>,挡不住 <code>while true do end</code>。指令数是确定的:同一段脚本每次烧掉的格数一样,报错信息里带预算值,好对照。</div>
+
+<h3>3.4 装载、重载与注册归属</h3>
+<ul>
+<li>启动顺序:建宿主 → 设存储目录 → 按「依赖拓扑 → order → id」跑每个包的每个脚本(单文件失败<b>不带走整包</b>) → 最后跑散装脚本。装载失败汇总成<b>一个</b>弹窗(最多列 5 条,其余见日志)。</li>
+<li>热重载按文件指纹触发;重跑前<b>先编译再清旧注册</b> —— 语法错的版本清不掉正在工作的那套。</li>
+<li>同一文件重跑会<b>整块替换</b>它登记的所有东西(事件、命令、快捷键、画法、定时器、窗格声明…),不会越跑越多。</li>
+<li>每条注册都记着「来自哪个文件的哪一块」,「脚本包」对话框停用一个包、或关掉按需包的窗格时,能把这些一次清干净,并跑满两轮 Lua GC 把闭包和表真的还回去。</li>
+<li>窗格声明是<b>活的</b>:增删窗格当场建/拆 HWND,不用重开进程。声明每条都带块名,所以能反查「这块窗格是哪个包的最后一块」—— 按需包据此在关窗时整包退出。</li>
+</ul>
+</section>
+
+<!-- ==================== 4 坐标约定 ==================== -->
+<section class="chapter" id="coords">
+<h2>4 坐标约定</h2>
+<p class="lead">文档 API 用 <b>1 基行号 + 1 基 UTF-8 字节列</b>;视口 API 用 <b>0 基行号 + 0 基字符列</b>。两把尺子,别混。</p>
+
+<h3>4.1 文档 API 的坐标</h3>
+<ul>
+<li><b>行号</b>从 1 起,<code>App.doc.line_count()</code> 是最后一行;越界返回 <code>nil</code> / <code>false</code>。</li>
+<li><b>列</b>是该行 UTF-8 文本里的 1 基字节偏移:<code>1</code> 是行首第一个字节;<code>len+1</code> 是行尾之后(<code>App.doc.line_len(n)</code> 返回不含换行符的字节数)。</li>
+<li>Lua 字符串是字节串,<code>#</code>、<code>string.sub</code>、<code>string.byte</code> 的下标与这套列坐标<b>天然对齐</b>。</li>
+<li>区间一律 <b>[start, end)</b>:含起点,不含终点。删除整行文字是 <code>replace(l, 1, l, len+1, "")</code>。</li>
+</ul>
+<table>
+<tr><th>输入</th><th>换算规则</th></tr>
+<tr><td>字节列落在多字节字符<b>内部</b></td><td>向下取整到该字符的起始字节</td></tr>
+<tr><td>字节列超过行尾</td><td>夹到行尾(插入时等于"接到行末")</td></tr>
+<tr><td><code>span_text</code>/<code>replace</code> 的两个端点次序颠倒</td><td>自动交换,按小→大处理</td></tr>
+<tr><td>行号 0 或超出 <code>line_count()</code>(读 API)</td><td><code>nil</code></td></tr>
+<tr><td>行号越界(写 API)</td><td><code>false</code>;只读文档也返回 <code>false</code></td></tr>
+</table>
+<pre><code>-- 行 "中文abc":字节列 1='中'(占 3 字节),4='文',7='a',10=len+1(行尾之后)
+App.doc.insert(1, 7, "X")     -- 中文Xabc
+App.doc.line_len(1)            -- 10(不含换行符)</code></pre>
+
+<h3>4.2 视口 API 的坐标</h3>
+<p><code>App.view.info()</code> 与 <code>App.view.scroll_to()</code> 服务于「现在看到哪儿」这类几何问题:</p>
+<table>
+<tr><th>字段</th><th>含义</th><th>基</th></tr>
+<tr><td><code>top_line</code> / <code>scroll_to</code> 的 line</td><td>视口顶部可见的<b>逻辑行</b></td><td>0 基</td></tr>
+<tr><td><code>top_col</code> / <code>scroll_to</code> 的 col</td><td>水平滚动位置</td><td>0 基<b>字符</b>列</td></tr>
+<tr><td><code>rows</code> / <code>cols</code></td><td>可见行数 / 列数(按当前字体与换行模式)</td><td>—</td></tr>
+<tr><td><code>caret_line</code> / <code>caret_col</code></td><td>光标位置</td><td>0 基行、0 基字符列</td></tr>
+</table>
+<p>同理,绘制档里 <code>ctx.rows[i].line</code> 也是 0 基逻辑行号。1 基与 0 基的分界:「改文档」一律 1 基字节列,「看几何」一律 0 基字符列。</p>
+</section>
+
+<!-- ==================== 5 App 核心 API ==================== -->
+<section class="chapter" id="app">
+<h2>5 App 核心 API</h2>
+<p class="lead">全局只有一张表 <code>App</code>(以及被改写的 <code>print</code>)。本章是不碰文档的那一半。</p>
+
+<table>
+<tr><th>调用</th><th>返回</th><th>说明</th></tr>
+<tr><td class="nowrap"><code>App.version()</code></td><td>字符串</td><td>脚本 API 版本,当前 <code>"0.2"</code></td></tr>
+<tr><td class="nowrap"><code>App.alert(msg)</code></td><td>—</td><td>模态消息框,标题「DogEdit Lua」,信息图标;装载失败的报告是错误图标</td></tr>
+<tr><td class="nowrap"><code>App.log(msg)</code></td><td>—</td><td>日志一行:stderr(<code>[lua] </code> 前缀)+ <code>OutputDebugString</code>。绘制回调里也能用(那时它走日志 sink)</td></tr>
+<tr><td class="nowrap"><code>print(msg)</code></td><td>—</td><td>与 <code>App.log</code> 同一条路。只收一个字符串,需要排版自己 <code>string.format</code></td></tr>
+<tr><td class="nowrap"><code>App.prompt(title[, initial])</code></td><td>字符串或 <code>nil</code></td><td>单行输入对话框;取消返回 <code>nil</code>。headless 环境(如 <code>--ui-lint</code>)恒为 <code>nil</code></td></tr>
+<tr><td class="nowrap"><code>App.now()</code></td><td>毫秒数</td><td>宿主启动以来的单调时钟(不受系统时间改动影响)。沙箱里唯一的时钟。<b>绘制回调里读它 = 这份画法不进缓存</b>(动画靠这个)</td></tr>
+<tr><td class="nowrap"><code>App.timer(ms, fn[, repeat])</code></td><td>id</td><td>登记定时器,返回整数 id。<code>ms</code> 取 1..86400000(1 ms 到一天);<code>repeat</code> 缺省 <code>false</code>(一次性)。回调在 <code>WM_TIMER</code> 里跑(永不在绘制期间),按意图档、2000 万条预算执行。<b>报错的定时器当场注销</b>;重复定时器先推进下次到期再触发,卡久了不补发、直接对齐到现在之后</td></tr>
+<tr><td class="nowrap"><code>App.cancel(id)</code></td><td>布尔</td><td>注销一个定时器;回调里取消自己(重复定时器)一定生效</td></tr>
+<tr><td class="nowrap"><code>App.taskbar(state[, completed[, total]])</code></td><td>布尔</td><td>主窗口任务栏按钮的进度状态,见 5.1。<code>state</code> 取 <code>"none" / "indeterminate" / "normal" / "error" / "paused"</code>(大小写不敏感);<code>completed</code> / <code>total</code> 缺省都是 1(满格),<code>total</code> 须 &gt; 0,完成量自动夹到总量。返回宿主是否真的设置了(没有任务栏的后端或 COM 失败为 <code>false</code>)。<b>脚本自己负责用 <code>"none"</code> 摘除</b></td></tr>
+<tr><td class="nowrap"><code>App.defer(fn)</code></td><td>—</td><td>排队一个函数,本回调返回后执行</td></tr>
+<tr><td class="nowrap"><code>App.run(命令名)</code></td><td>—</td><td>排队一个命令(见 7.2);名字须 1..128 字符</td></tr>
+<tr><td class="nowrap"><code>App.pending()</code></td><td>整数</td><td>待办队列里还排着几件</td></tr>
+<tr><td class="nowrap"><code>App.on(事件名, fn)</code></td><td>—</td><td>注册事件回调(见第 7 章)</td></tr>
+<tr><td class="nowrap"><code>App.command(名字, fn)</code></td><td>—</td><td>注册命令(见 7.3)</td></tr>
+<tr><td class="nowrap"><code>App.keymap(组合键, 命令名)</code></td><td>—</td><td>绑定快捷键,支持方向键 / 空格等具名键(见 7.3)</td></tr>
+<tr><td class="nowrap"><code>App.storage(名字)</code></td><td>表对象</td><td>取一个持久字符串表(见第 8 章)</td></tr>
+</table>
+<p>其余成员在后续章节:<code>App.doc</code>(第 6 章)、<code>App.sel</code> / <code>App.view</code>(第 6 章)、<code>App.theme</code>(第 14 章)、<code>App.ui</code>(第 9–14 章)。</p>
+
+<div class="box warn"><b>可用的标准库</b>沙箱只装了 coroutine、table、string、math、utf8 五个标准库。<b>没有 os、io、package、debug</b>:读文件、写文件、环境变量、时间格式化都不存在 —— 脚本能碰到的全部 I/O 就是本文档列的这些。往全局写变量只影响脚本自己(读会穿透到标准库,写不会污染)。</div>
+
+<h3>5.1 任务栏进度状态</h3>
+<p>外部工具跑完时,任务栏按钮会亮起一条<b>满格进度状态</b>:退出码 0 用 <code>normal</code>(系统强调色),非 0 或被终结用 <code>error</code>(红色),同时还有一枚绿色对勾 / 红色叉号徽标。<b>Windows 11 的任务栏只把进度画成图标下方约 30×4 像素的细线,<code>normal</code> 取系统强调色而不是固定的绿色</b>;完成时这条状态直接满格显示该颜色,不再闪动。窗口在前台时 6 秒后摘除;<b>窗口在后台时提醒一直保留</b>,徽标、进度条和闪烁都要等用户点击任务栏激活窗口才由宿主一起摘除(倒计时期间切走也一样保留)。「选项 → 常规」可以单独关掉这一项。<code>App.taskbar</code> 驱动的是<b>同一块</b>状态,脚本因此能给自己发起的任务报进度、报结果。</p>
+<table>
+<tr><th>state</th><th>按钮上的样子</th></tr>
+<tr><td><code>"none"</code> / <code>"off"</code></td><td>没有进度条(收尾用)</td></tr>
+<tr><td><code>"indeterminate"</code> / <code>"busy"</code></td><td>滚动跑马灯,总量未知时用,忽略刻度</td></tr>
+<tr><td><code>"normal"</code> / <code>"ok"</code></td><td>系统强调色(Win7/10 上是绿色),按 <code>completed/total</code> 填充</td></tr>
+<tr><td><code>"error"</code> / <code>"fail"</code></td><td>红色,按 <code>completed/total</code> 填充</td></tr>
+<tr><td><code>"paused"</code> / <code>"pause"</code></td><td>黄色,按 <code>completed/total</code> 填充</td></tr>
+</table>
+<pre><code>-- 自己跑的任务:跑马灯 → 报刻度 → 结果 → 6 秒后收尾
+App.command("build.status", function()
+    App.taskbar("indeterminate")
+    App.taskbar("normal", 3, 10)
+    local ok = true                        -- 换成你的任务结果
+    App.taskbar(ok and "normal" or "error")   -- 满格系统色 / 满格红
+    App.timer(6000, function() App.taskbar("none") end)
+end)</code></pre>
+<div class="box note"><b>谁负责摘除</b>宿主只摘自己挂上去的那一条:脚本一调 <code>App.taskbar</code>,进度条就归脚本所有,仍在倒计时的工具完成提醒不会把它清掉;反过来,工具完成时若脚本正挂着进度条,提醒结束后会把脚本那条原样还回去。宿主不替脚本自动清除,所以长任务记得用 <code>"none"</code> 或定时器收尾。这是意图档 API —— 绘制回调里没有 bridge,调它会抛 <code>no bridge: called outside a host entry point</code>。</div>
+</section>
+
+<!-- ==================== 6 文档、选择与视口 ==================== -->
+<section class="chapter" id="doc">
+<h2>6 文档、选择与视口</h2>
+<p class="lead">这组 API 只作用于<b>当前活动文档</b>(页签栏上正在编辑的那一个)。批量处理多文档需要把命令挂到事件或由用户逐个执行。</p>
+
+<h3>6.1 App.doc — 读</h3>
+<table>
+<tr><th>调用</th><th>返回</th><th>说明</th></tr>
+<tr><td class="nowrap"><code>App.doc.name()</code></td><td>字符串</td><td>显示名(未命名文档是它的占位名)</td></tr>
+<tr><td class="nowrap"><code>App.doc.path()</code></td><td>字符串或 <code>nil</code></td><td>磁盘路径;未落盘为 <code>nil</code></td></tr>
+<tr><td class="nowrap"><code>App.doc.line_count()</code></td><td>整数</td><td>总行数</td></tr>
+<tr><td class="nowrap"><code>App.doc.line(n)</code></td><td>字符串或 <code>nil</code></td><td>第 n 行文本,<b>不含行尾符</b>;越界 <code>nil</code></td></tr>
+<tr><td class="nowrap"><code>App.doc.line_len(n)</code></td><td>整数</td><td>第 n 行的字节数(不含行尾符);越界也是 0,别拿它判行存在,用 <code>line(n)</code> 判</td></tr>
+<tr><td class="nowrap"><code>App.doc.text()</code></td><td>字符串</td><td>全文(行间以文档实际 EOL 连接)。大文档慎用 —— 一次性拼出整个副本</td></tr>
+<tr><td class="nowrap"><code>App.doc.span_text(sl, sc, el, ec)</code></td><td>字符串或 <code>nil</code></td><td>[起点, 终点) 区间文本;端点自动排序,越界 <code>nil</code></td></tr>
+<tr><td class="nowrap"><code>App.doc.meta()</code></td><td>表</td><td>一次取齐元信息,见下表</td></tr>
+</table>
+<table>
+<tr><th><code>meta()</code> 字段</th><th>类型</th><th>说明</th></tr>
+<tr><td><code>encoding</code></td><td>字符串</td><td>编码名原样(<code>UTF-8</code> / <code>GBK</code> / <code>windows-1252</code> …)</td></tr>
+<tr><td><code>bom</code></td><td>布尔</td><td>带 BOM 与否</td></tr>
+<tr><td><code>eol</code></td><td>字符串</td><td><code>"LF"</code> / <code>"CRLF"</code> / <code>"CR"</code>;空文档答 <code>"LF"</code></td></tr>
+<tr><td><code>syntax</code></td><td>字符串</td><td>语法键(<code>"rs"</code> / <code>"py"</code> …);没挂语法是空串</td></tr>
+<tr><td><code>bytes</code></td><td>整数</td><td>磁盘字节数;未落盘为 0</td></tr>
+<tr><td><code>lines</code></td><td>整数</td><td>总行数(与 <code>line_count()</code> 相同)</td></tr>
+<tr><td><code>read_only</code> / <code>modified</code> / <code>large</code></td><td>布尔</td><td>只读 / 已修改 / 大文件模式(大文件模式没有语法解析与逐行修改状态)</td></tr>
+</table>
+<div class="box warn"><b>meta() 返回的是复用表</b>两次 <code>meta()</code> 拿到的是<b>同一张 Lua 表</b>,只是字段被改写。要留快照就当场抄字段:<code>local m = App.doc.meta(); local was_modified = m.modified</code> 这样存标量,不要把 <code>m</code> 本身存起来比旧值。</div>
+
+<h3>6.2 App.doc — 写</h3>
+<table>
+<tr><th>调用</th><th>返回</th><th>说明</th></tr>
+<tr><td class="nowrap"><code>App.doc.insert(line, col, text)</code></td><td>布尔</td><td>在 (line, col) 插入文本(可含换行,换行按文档 EOL 处理)</td></tr>
+<tr><td class="nowrap"><code>App.doc.replace(sl, sc, el, ec, text)</code></td><td>布尔</td><td>把 [起点, 终点) 换成 text;<code>text = ""</code> 即删除;端点自动排序</td></tr>
+<tr><td class="nowrap"><code>App.doc.delete(sl, sc, el, ec)</code></td><td>布尔</td><td>删除区间,等价于 <code>replace(…, "")</code></td></tr>
+</table>
+<ul>
+<li>返回 <code>false</code> 的三种情况:位置非法、文档只读、大文件模式下单次改动超过 800 万字符(撤销快照的捕获上限)。</li>
+<li>编辑走与键盘输入<b>同一条撤销 / 重排 / 书签维护</b>通道:撤销历史、行修改状态、书签位置都保持正确;每次调用在撤销历史里是一个独立步骤。</li>
+<li>写完不需要刷新 —— 宿主在回调返回后统一收尾(夹光标、重排版、重画)。</li>
+</ul>
+
+<h3>6.3 App.sel — 选择</h3>
+<table>
+<tr><th>调用</th><th>返回</th><th>说明</th></tr>
+<tr><td class="nowrap"><code>App.sel.count()</code></td><td>整数</td><td>选区个数(列模式可以多个)</td></tr>
+<tr><td class="nowrap"><code>App.sel.get([i])</code></td><td>4 个值或无</td><td>第 i 个(0 基,缺省 0)选区的 <code>sl, sc, el, ec</code>(1 基行、1 基字节列);没有该选区时不返回值</td></tr>
+<tr><td class="nowrap"><code>App.sel.text()</code></td><td>字符串</td><td><b>第一个</b>选区的文本;无选区为空串</td></tr>
+<tr><td class="nowrap"><code>App.sel.set(sl, sc, el, ec)</code></td><td>—</td><td>把选择设为一个区间(端点自动排序、位置越界自动夹紧);光标落在区间终点,<b>多选被替换成这一个</b></td></tr>
+</table>
+<pre><code>-- 把选中的词变全大写
+local t = App.sel.text()
+if #t &gt; 0 then
+    local sl, sc, el, ec = App.sel.get()
+    App.doc.replace(sl, sc, el, ec, t:upper())
+end</code></pre>
+
+<h3>6.4 App.view — 视口</h3>
+<table>
+<tr><th>调用</th><th>返回</th><th>说明</th></tr>
+<tr><td class="nowrap"><code>App.view.info()</code></td><td>表</td><td>视口快照,<b>同样是复用表</b>(字段:top_line / top_col / rows / cols / caret_line / caret_col,见 4.2)</td></tr>
+<tr><td class="nowrap"><code>App.view.scroll_to(line[, col])</code></td><td>—</td><td>滚到某行某列(0 基);入队后执行,行号自动夹到文档内</td></tr>
+</table>
+</section>
+
+<!-- ==================== 7 事件、命令与快捷键 ==================== -->
+<section class="chapter" id="events">
+<h2>7 事件、命令与快捷键</h2>
+<p class="lead">脚本进入程序的三个正式通道:事件回调(被动)、命令(菜单可点)、快捷键(键盘可达)。</p>
+
+<h3>7.1 事件:App.on</h3>
+<pre><code>App.on("doc.saved", function()
+    App.log("saved: " .. App.doc.name())
+end)</code></pre>
+<table>
+<tr><th>事件名</th><th>触发时机</th><th>状态</th></tr>
+<tr><td><code>doc.saved</code></td><td>当前文档保存成功之后(含另存)</td><td><span class="badge ok">已触发</span></td></tr>
+<tr><td><code>doc.opened</code></td><td>文档打开之后</td><td><span class="badge ok">已触发</span></td></tr>
+<tr><td><code>doc.closed</code> / <code>theme.changed</code> / <code>caret.moved</code> / <code>view.scrolled</code></td><td>—</td><td><span class="badge na">可注册、当前版本无触发点</span>登记合法但外壳尚未接线,回调不会执行</td></tr>
+</table>
+<ul>
+<li>同一事件可以多个脚本各挂一个回调,按<b>装载顺序</b>依次执行;某个回调报错只记日志,不影响后面的。</li>
+<li>事件名大小写敏感,但<b>大驼峰旧名仍认</b> (<code>DocSaved</code>、<code>DocOpened</code>):触发时新旧名字两边都会跑,改名不会让老脚本静默失效。</li>
+<li>回调是意图档:能用全部 API,包括 <code>App.run</code>(排队,回调返回后真正执行)。</li>
+</ul>
+
+<h3>7.2 命令:注册与运行</h3>
+<pre><code>App.command("acme.tick", function()
+    App.alert("ticked at " .. App.now())
+end)
+App.keymap("Ctrl+F9", "acme.tick")
+
+-- 别处(或别的脚本)触发它:
+App.run("acme.tick")</code></pre>
+<ul>
+<li>注册的命令按名字排序出现在「扩展」菜单底部,形如 <b>Lua: acme.tick</b>。</li>
+<li><code>App.run(名字)</code> 的解析顺序:<b>脚本命令优先</b>,没有同名脚本命令就落到内置命令表。内置命令认两种拼法:点分(<code>"file.save"</code>)或带前缀(<code>"cm_file_save"</code>)。</li>
+<li>命令名长度须 1..128 字符。运行不存在或被拒绝的命令,结果只是一行日志(<code>App.run: no command …</code>),不弹窗。</li>
+</ul>
+<div class="box note"><b>内置命令名怎么查</b>内置命令是 <code>cm_</code> + 蛇形名的形式,比如 <code>file.save</code>、<code>edit.copy</code> 风格 —— 完整对照表见用户手册第 24 章(快捷键)与「命令行」一章;<code>key.ini</code> 的 <code>[Shortcut]</code> 段用的也是同一套名字。写错时 <code>App.run</code> 的日志会点名。</div>
+
+<h3>7.3 快捷键:App.keymap</h3>
+<pre><code>App.keymap("Ctrl+Shift+T", "acme.tick")   -- 绑到自己的命令
+App.keymap("Ctrl+Alt+D",   "file.save")   -- 也能绑内置命令(点分名)</code></pre>
+<ul>
+<li>组合键写法:修饰词 <code>Ctrl</code> / <code>Shift</code> / <code>Alt</code>(<code>Control</code> 也认)任意组合,加号连接,最后是<b>一个键</b>:字母、数字、<code>F1</code>..<code>F12</code>,或下列具名键(大小写不敏感):<code>Up</code> / <code>Down</code> / <code>Left</code> / <code>Right</code> / <code>Space</code> / <code>Enter</code> / <code>Esc</code> / <code>Tab</code> / <code>Backspace</code> / <code>Insert</code> / <code>Delete</code> / <code>Home</code> / <code>End</code> / <code>PageUp</code> / <code>PageDown</code>。别名 <code>Return</code> / <code>Escape</code> / <code>Back</code> / <code>Ins</code> / <code>Del</code> / <code>PgUp</code> / <code>PgDn</code> 同样认。不支持双键和弦,也不支持其它键名;写错当场报错并列出合法格式。</li>
+<li>派发优先级是<b>最后</b>:内置命令表(key.ini 与内置键)先查,和弦前缀第二,都未命中才轮到脚本 —— 脚本<b>不能覆盖</b>内置键。</li>
+<li>焦点规则:编辑区里要求带 <code>Ctrl</code> 或 <code>Alt</code>(裸字母、Shift+字母要落进文档);在脚本自建窗格内无此限制(窗格获得焦点时裸键也派发)。</li>
+<li>热重载同文件会整块替换该文件登记的快捷键。</li>
+</ul>
+
+<h3>7.4 状态栏与工具栏上的命令</h3>
+<ul>
+<li>状态栏段声明 <code>click = "命令名"</code>(见 12.2):点击该格跑命令,脚本命令与内置命令都认。</li>
+<li>工具栏按钮声明 <code>command = "命令名"</code>(见 12.3):同样先查脚本命令再落内置。</li>
+</ul>
+</section>
+
+<!-- ==================== 8 持久存储 ==================== -->
+<section class="chapter" id="storage">
+<h2>8 持久存储 App.storage</h2>
+<p class="lead">字符串到字符串的键值表,存盘持久,重启还在。脚本保存设置、计数器、窗口状态的正规去处。</p>
+
+<pre><code>local db = App.storage("acme.clock")
+db.set("runs", tostring((tonumber(db.get("runs")) or 0) + 1))
+db.set("last_doc", App.doc.name())
+
+for _, k in ipairs(db.keys("last_")) do   -- 带前缀过滤,按键名排序
+    App.log(k .. " = " .. db.get(k))
+end</code></pre>
+
+<table>
+<tr><th>调用</th><th>返回</th><th>说明</th></tr>
+<tr><td class="nowrap"><code>App.storage(名字)</code></td><td>表</td><td>名字须 1..64 字符;同名返回同一张表</td></tr>
+<tr><td class="nowrap"><code>t:get(key)</code></td><td>字符串或 <code>nil</code></td><td>没有该键得 <code>nil</code></td></tr>
+<tr><td class="nowrap"><code>t:set(key, value)</code></td><td>—</td><td>键、值都必须是<b>字符串</b>(数字先 <code>tostring</code>);<b>每次 set 立即落盘</b></td></tr>
+<tr><td class="nowrap"><code>t:del(key)</code></td><td>—</td><td>删除并落盘</td></tr>
+<tr><td class="nowrap"><code>t:keys([前缀])</code></td><td>数组</td><td>全部键名,排序;给了前缀就过滤</td></tr>
+<tr><td class="nowrap"><code>t:count()</code></td><td>整数</td><td>键数</td></tr>
+</table>
+
+<ul>
+<li>落盘位置:<code>exe目录\scripts\storage.json</code>,所有表共用一个 JSON 文件(<code>{"表名": {"键": "值", …}}</code>)。</li>
+<li>值<b>只能是字符串</b> —— 想存表就 JSON 编码(<code>string.format</code> 手拼或按约定序列化)。</li>
+<li>存储目录只有一份:即使散装脚本放在工作目录的 <code>scripts\</code>,storage.json 也固定在 <code>exe目录\scripts\</code>。</li>
+<li>装载期间(脚本文件顶层)就可以读写,不需要等某个事件。</li>
+</ul>
+</section>
+
+<!-- ==================== 9 皮肤与 UI 总览 ==================== -->
+<section class="chapter" id="skin">
+<h2>9 皮肤与 UI 总览</h2>
+<p class="lead">主题文件管「颜色、尺寸、形状、字体」;要<b>改画法</b>、要<b>新加一块东西</b>,写 Lua。<code>App.ui</code> 下面四张表各管一件事,另有一个函数管「脚本状态改完了、请重画」。</p>
+
+<table>
+<tr><th>表 / 函数</th><th>管什么</th><th>章</th></tr>
+<tr><td class="nowrap"><code>App.ui.paint</code></td><td>接管某个区域怎么画(指针、悬停提示也在这)</td><td><a href="#paint">10</a>、<a href="#canvas">11</a></td></tr>
+<tr><td class="nowrap"><code>App.ui.layout</code></td><td>声明多出哪些元素:停靠窗格 / 状态栏段 / 工具栏按钮,以及运行时增删改</td><td><a href="#layout">12</a></td></tr>
+<tr><td class="nowrap"><code>App.ui.on</code> / <code>App.ui.off</code></td><td>区域被点了(左键 / 右键)</td><td><a href="#press">13</a></td></tr>
+<tr><td class="nowrap"><code>App.ui.repaint([区域名])</code></td><td>丢掉绘制缓存并请求重画;点名 <code>pane.&lt;id&gt;</code> 时只作废那块脚本窗格</td><td><a href="#paint">10.4</a></td></tr>
+<tr><td class="nowrap"><code>App.ui.style</code></td><td>运行时改外观:颜色 / 度量 / 形状 / 字体</td><td><a href="#style">14</a></td></tr>
+</table>
+<div class="box note"><b>状态改完要叫一声</b>绘制回调仍是纯函数:不要在画法里推进状态。命令、事件、定时器里改了 Lua upvalue 之后调 <code>App.ui.repaint("pane.clock")</code>,宿主丢这一块的缓存并作废对应窗口;不给名字或给别的区域名则退回全量重画(主窗口自绘区域 + 所有脚本窗格)。一次入口里连调多次只重画一帧。仓库示例 <code>packages\snake\</code> 用的就是这条路。</div>
+<p><code>App.theme</code> 不在 <code>App.ui</code> 下:它是<b>只读</b>的当前主题(<code>name()</code> / <code>color(token)</code> / <code>list()</code>),命令和事件回调里也能问;绘制回调里用 <code>ctx.theme</code> 更快(同一份数据的投影)。</p>
+
+<h3>9.1 一个能跑的最小皮肤</h3>
+<pre><code>local ui = App.ui
+
+ui.paint:on("status.pane", function(c, ctx)
+  c:fill(ctx.rect, "#203040")
+  c:text(ctx.rect:inset(6, 0), "@text", "#00FF88", { ellipsis = true })
+  return true
+end)</code></pre>
+<p>把这段存成 <code>scripts\skin.lua</code>(或做成包,见第 15 章)启动即可。仓库示例 <code>packages\luapaint\</code>(LuaPaint)演示了全部能力:状态栏、页签、停靠页签、工具栏的画法,外加三块自绘停靠窗格;<code>packages\snake\</code> 则是一个不碰文档的交互小程序(见第 9 章的 <code>App.ui.repaint</code>),它写了 <code>launch</code>,所以只在点「扩展 → 贪吃蛇」时才装载。两者都不进发布包。</p>
+
+<h3>9.2 外观合成的三层</h3>
+<table>
+<tr><th>层</th><th>来源</th><th>优先级</th></tr>
+<tr><td>出厂值</td><td>程序内置</td><td>最低</td></tr>
+<tr><td>主题文件</td><td><code>themes\&lt;名字&gt;.ini</code> 的 [Theme] / [Metrics] / [Shape] / [Fonts]</td><td>中</td></tr>
+<tr><td>脚本覆盖</td><td><code>App.ui.style</code> 在运行时写的</td><td>最高</td></tr>
+</table>
+<p>没有第四层:脚本包不再自带主题文件,要动外观就在脚本里用 <code>App.ui.style</code>(第 14 章)。脚本改完外观是「下一次重画就对了」,同一帧连改十个值只重画一次。</p>
+
+<h3>9.3 声明与画法分离</h3>
+<p>元素叫什么、长在哪(<code>App.ui.layout</code>)与像素怎么画(<code>App.ui.paint</code>)之间<b>没有任何指针</b>:外观按区域名在主题里寻址(如 <code>pane.clock.bg</code>),行为在 <code>App.command</code> 里注册。所以换主题不用改一行布局;改布局也不用碰画法。</p>
+</section>
+
+<!-- ==================== 10 接管绘制 ==================== -->
+<section class="chapter" id="paint">
+<h2>10 接管绘制 App.ui.paint</h2>
+<p class="lead">让某个区域的像素完全由脚本说了算。画法是<b>纯函数</b>:输入几何与状态,输出绘制指令。</p>
+
+<h3>10.1 注册与撤销</h3>
+<table>
+<tr><th>调用</th><th>说明</th></tr>
+<tr><td class="nowrap"><code>ui.paint:on(区域名, function(c, ctx) … end)</code></td><td>接管一个区域。区域名<b>当场校验</b>,写错这一行就报错(并列出合法名字)</td></tr>
+<tr><td class="nowrap"><code>ui.paint:off(区域名)</code></td><td>撤销接管,交回内置画法</td></tr>
+<tr><td class="nowrap"><code>ui.paint:list()</code></td><td>已注册回调的区域名数组(排序)</td></tr>
+<tr><td class="nowrap"><code>ui.paint:hint(区域名, { cursor=, tip= })</code></td><td>悬停指针与提示,见第 13 章</td></tr>
+<tr><td class="nowrap"><code>ui.paint:unhint(区域名)</code></td><td>撤销悬停声明</td></tr>
+</table>
+<p>同一区域再 <code>:on</code> 一次是<b>替换</b>;热重载重跑整个文件不会叠出两条。</p>
+
+<h3>10.2 区域名词汇表</h3>
+<p>区域名小写点分,大小写不敏感。<span class="badge ok">已接线</span>表示当前版本外壳真的会在这里征询脚本;<span class="badge na">未接线</span>表示注册合法、词汇表认它,但外壳尚无征询点 —— 现在写了不会报错,也不会生效。</p>
+<table>
+<tr><th>区域名</th><th>画的是什么</th><th>接线</th></tr>
+<tr><td class="nowrap"><code>status.pane</code></td><td>一个状态格(脚本声明的段是 <code>status.&lt;id&gt;</code>,同一格)</td><td><span class="badge ok">已接线</span></td></tr>
+<tr><td class="nowrap"><code>tab</code></td><td>一个文档页签(含图标 / 标题 / 修改标记 / 关闭钮)</td><td><span class="badge ok">已接线</span></td></tr>
+<tr><td class="nowrap"><code>dock.tab</code></td><td>停靠面板的页签(图标与文字仍归控件,只画底色)</td><td><span class="badge ok">已接线</span></td></tr>
+<tr><td class="nowrap"><code>toolbar.button</code></td><td>工具栏一个按钮</td><td><span class="badge ok">已接线</span></td></tr>
+<tr><td class="nowrap"><code>editor.overlay</code></td><td>可见行的自定义装饰(整屏行表一次给全)</td><td><span class="badge ok">已接线</span></td></tr>
+<tr><td class="nowrap"><code>editor.gutter</code></td><td>行号 / 折叠 / 图标 / 行状态四条 gutter(整列)</td><td><span class="badge ok">已接线</span></td></tr>
+<tr><td class="nowrap"><code>pane.&lt;id&gt;</code></td><td>脚本自建窗格(12.1 声明的每一块)</td><td><span class="badge ok">已接线</span></td></tr>
+<tr><td><code>frame</code> / <code>menubar</code> / <code>menu.row</code> / <code>menu.separator</code> / <code>toolbar</code> / <code>tabstrip</code> / <code>tab.glyph</code> / <code>statusbar</code> / <code>status.grip</code> / <code>scroll.v</code> / <code>scroll.h</code> / <code>editor</code> / <code>editor.ruler</code> / <code>editor.minimap</code> / <code>editor.below</code> / <code>panel</code> / <code>panel.row</code> / <code>output.bar</code> / <code>dialog</code> / <code>dialog.button</code> / <code>dialog.field</code> / <code>popup</code> / <code>custom</code></td><td>词汇表里的其余区域</td><td><span class="badge na">未接线</span></td></tr>
+</table>
+<div class="box note"><b>家族名</b>在外观寻址(第 14 章)里 <code>status</code>、<code>scroll</code>、<code>menu</code> 是家族名,分别展开成两三个具体区域;<code>pane.&lt;id&gt;</code>、<code>status.&lt;id&gt;</code> 中的 id 用小写字母数字 <code>_</code> <code>-</code>,不超过 40 字节。</div>
+
+<h3>10.3 回调契约</h3>
+<pre><code>ui.paint:on("tab", function(c, ctx)
+  ...                                  -- 往 c 上发指令,读 ctx 拿几何与状态
+  return true                          -- 返回值决定谁画
+end)</code></pre>
+<table>
+<tr><th>返回</th><th>含义</th></tr>
+<tr><td><code>true</code></td><td>这一块完全由脚本负责,内置画法让位</td></tr>
+<tr><td><code>false</code> / <code>nil</code></td><td>交回内置画法(已发出的指令<b>不会</b>被用)。只想改某一格时,先画那格再 <code>return false</code> 也不行 —— 要么全接要么全让</td></tr>
+<tr><td><b>数字</b>(脚本窗格)</td><td>数字按真值处理(等于「我画了」),同时兼职报<b>内容总高</b>(DIP):宿主拿它算窗格滚动条的滑块长度与最大滚动量。写 <code>return 1200</code> 就多告诉宿主一件事,老皮肤 <code>return true</code> 一字不改</td></tr>
+<tr><td>抛错</td><td>记一行日志(<b>每处只报一次</b>,不去重的话每秒几百行同样的栈),交回内置画法 —— <b>一个坏皮肤不该让窗口白屏</b></td></tr>
+</table>
+
+<h3>10.4 绘制缓存与「纯函数」规矩</h3>
+<ul>
+<li>结果按「区域 + 部件 + 状态 + 尺寸 + DPI」缓存;命中时<b>不进 Lua</b>,直接还上一份指令。正常皮肤的命中率在 90% 以上。</li>
+<li>缓存键放不下的输入(格子文字、滑块位置、文档快照、滚动量……)按「<b>回调读过才比对</b>」处理:没读 <code>ctx.text</code> 的画法,文字换了也照样命中。所以推荐用 <code>c:text(r, "@text", …)</code> 让宿主画字 —— 那种写法天生不读文字,缓存最有效。</li>
+<li>回调里读 <code>App.now()</code> 会让这份画法<b>永不进缓存</b>(动画就这样做);闭窗统计里会单列这类次数。</li>
+<li>点击回调可能改了画法要用的状态(计数器、选中项),宿主看不见那些变量,所以<b>点击之后该区域的缓存整区丢弃</b>。</li>
+<li><code>App.ui.repaint(区域名)</code> 是显式的「这份缓存旧了」:命令 / 事件 / 定时器里改了 Lua 自己的状态后点名那一块,宿主丢缓存并作废对应窗口;不点名则整帧重画。点击回调已经自动丢该区域缓存,不必重复调。<b>不要在绘制回调里调它</b> —— 画法仍须是纯函数。</li>
+<li><code>--skin-debug</code>(或环境变量 <code>DOGEDIT_SKIN_DEBUG=1</code>)让每个绘制回调连跑两遍逐条比对指令,专抓「不纯」的画法;退出时报告副作用处数、缓存命中率、因读时钟不缓存的次数。它让绘制翻倍,平时别开。</li>
+</ul>
+</section>
+
+<!-- ==================== 11 画布与上下文 ==================== -->
+<section class="chapter" id="canvas">
+<h2>11 画布 c 与上下文 ctx</h2>
+<p class="lead">绘制回调的两个参数:往 <code>c</code> 上发指令,从 <code>ctx</code> 读这一帧的几何、状态与文字。坐标单位是 DIP(96 DPI 的像素),宿主按窗口 DPI 放大。</p>
+
+<h3>11.1 画布 c 的全部方法</h3>
+<table>
+<tr><th>调用</th><th>说明</th></tr>
+<tr><td class="nowrap"><code>c:fill(rect, color)</code></td><td>实心填充</td></tr>
+<tr><td class="nowrap"><code>c:rect(rect, color[, width])</code></td><td>描边,画在矩形内侧;width 缺省 1</td></tr>
+<tr><td class="nowrap"><code>c:round(rect, radius[, fill[, stroke[, stroke_w]]])</code></td><td>圆角矩形;fill / stroke 都可省,只描边或只填充</td></tr>
+<tr><td class="nowrap"><code>c:line(x1, y1, x2, y2, color[, width])</code></td><td>直线</td></tr>
+<tr><td class="nowrap"><code>c:poly(点表, color[, width[, closed]])</code></td><td>折线 / 多边形;点是 <code>{x=,y=}</code> 或 <code>{x, y}</code>,closed 缺省 false</td></tr>
+<tr><td class="nowrap"><code>c:circle(cx, cy, r[, fill[, stroke[, stroke_w]]])</code></td><td>圆</td></tr>
+<tr><td class="nowrap"><code>c:gradient(rect, from, to[, dir])</code></td><td>线性渐变;dir <code>"v"</code>(默认)或 <code>"h"</code></td></tr>
+<tr><td class="nowrap"><code>c:shadow(rect[, radius[, color[, blur]]])</code></td><td>投影;缺省 radius 0、黑色半透明、blur 4</td></tr>
+<tr><td class="nowrap"><code>c:text(rect, source, color[, opts])</code></td><td>文字,见 11.3</td></tr>
+<tr><td class="nowrap"><code>c:image(rect, index[, fit[, tint]])</code></td><td>图标精灵图的第 index 格;fit <code>"center"</code>(默认)/ <code>"stretch"</code> / <code>"tile"</code>;tint 上色</td></tr>
+<tr><td class="nowrap"><code>c:clip(rect)</code> / <code>c:unclip()</code></td><td>压入 / 弹出裁剪矩形(成对用)</td></tr>
+<tr><td class="nowrap"><code>c:spacer()</code></td><td>占位指令,回放时忽略;脚本用它做「分界」</td></tr>
+<tr><td class="nowrap"><code>c:count()</code></td><td>本帧已发出的指令条数(自检用)</td></tr>
+</table>
+<p>颜色一律写 <code>"#RRGGBB"</code>(正好 6 位十六进制,大小写均可;<code>#RRGGBBAA</code> 不收,写错当场报错)。同一帧里 <code>c</code> 是复用的:每帧绘制前清空,没有跨帧残留。</p>
+
+<h3>11.2 矩形:ctx.rect 与它的方法</h3>
+<p><code>rect</code> 是 userdata,字段 <code>x</code> / <code>y</code> / <code>w</code> / <code>h</code> / <code>right</code>(= x+w)/ <code>bottom</code>(= y+h),方法<b>全部返回新矩形</b>(不改原值),可以直接链下去:</p>
+<table>
+<tr><th>调用</th><th>说明</th></tr>
+<tr><td class="nowrap"><code>r:inset(dx[, dy])</code></td><td>四边向内缩;dy 缺省同 dx</td></tr>
+<tr><td class="nowrap"><code>r:outset(dx[, dy])</code></td><td>四边向外扩</td></tr>
+<tr><td class="nowrap"><code>r:with_width(w)</code> / <code>r:with_height(h)</code></td><td>只改宽 / 高,x、y 不动</td></tr>
+<tr><td class="nowrap"><code>r:move(dx, dy)</code></td><td>平移</td></tr>
+<tr><td class="nowrap"><code>tostring(r)</code></td><td><code>"x,y,w,h"</code>(调试)</td></tr>
+</table>
+<p>凡是收 <code>rect</code> 的地方也收字面表 <code>{ x=, y=, w=, h= }</code>(四个字段都可省,省了当 0)—— <code>editor.overlay</code> 里从行表算矩形时用它。</p>
+
+<h3>11.3 文字与占位符</h3>
+<table>
+<tr><th>opts 字段</th><th>取值</th><th>默认</th></tr>
+<tr><td><code>font</code></td><td>字体 token 名(<code>"mono"</code> / <code>"tab"</code> / <code>"status"</code> / <code>"menu"</code> / <code>"pane"</code> / <code>"ui"</code>)</td><td>区域自己的字体</td></tr>
+<tr><td><code>align</code></td><td><code>"start"</code> / <code>"center"</code> / <code>"right"</code>(或 <code>"end"</code>)</td><td><code>"start"</code></td></tr>
+<tr><td><code>valign</code></td><td><code>"top"</code> / <code>"middle"</code> / <code>"bottom"</code></td><td><code>"middle"</code></td></tr>
+<tr><td><code>ellipsis</code></td><td>true / false —— 放不下时画省略号</td><td>false</td></tr>
+<tr><td><code>clip</code></td><td>一个 rect</td><td>无</td></tr>
+</table>
+<table>
+<tr><th>source 写法</th><th>含义</th></tr>
+<tr><td class="nowrap"><code>"@text"</code></td><td>这一格的正文(状态格的内容、页签标题、按钮文字…)</td></tr>
+<tr><td class="nowrap"><code>"@label"</code></td><td>部件标签(工具栏按钮的悬停命令说明等)</td></tr>
+<tr><td class="nowrap"><code>"@value"</code></td><td>部件值</td></tr>
+<tr><td>其它字符串</td><td>字面量,原样画</td></tr>
+</table>
+<div class="box note"><b>优先用占位符</b>宿主已经把文字备好了;用 <code>"@text"</code> 不用读 <code>ctx.text</code>,缓存比对最便宜,也让宿主在文字变化时才重算。</div>
+
+<h3>11.4 上下文 ctx 的全部字段</h3>
+<table>
+<tr><th>字段</th><th>类型</th><th>说明</th></tr>
+<tr><td class="nowrap"><code>ctx.rect</code> / <code>ctx.w</code> / <code>ctx.h</code></td><td>rect / 数</td><td>这一块的矩形;w、h 是便捷取值</td></tr>
+<tr><td class="nowrap"><code>ctx.thumb</code></td><td>rect</td><td>「会动的部件」:滚动条是滑块;其它区域等于 rect</td></tr>
+<tr><td class="nowrap"><code>ctx.bar</code></td><td>rect</td><td>脚本窗格的滚动条<b>整条轨道</b>;没有滚动条是空矩形(w == 0),<code>if ctx.bar.w &gt; 0</code> 一处判断就够。其它区域等于 rect</td></tr>
+<tr><td class="nowrap"><code>ctx.scroll</code></td><td>数</td><td>竖直滚动位置(DIP);<b>由皮肤自己减</b>,宿主不替你平移 —— 固定表头免费:那几行不读 scroll 就行</td></tr>
+<tr><td class="nowrap"><code>ctx.part</code></td><td>字符串</td><td>部件名:状态格是段 id(<code>"encoding"</code>…),其它区域是区域名</td></tr>
+<tr><td class="nowrap"><code>ctx.text</code> / <code>ctx.label</code> / <code>ctx.value</code></td><td>字符串</td><td>宿主备好的三路文字(对应 <code>@text</code> / <code>@label</code> / <code>@value</code>)</td></tr>
+<tr><td class="nowrap"><code>ctx.dpi</code></td><td>整数</td><td>该区域解析到的 DPI</td></tr>
+<tr><td class="nowrap"><code>ctx.theme</code></td><td>表</td><td>当前主题调色板:<code>ctx.theme["status.bg"]</code> → <code>"#RRGGBB"</code>(89 个 token,见 14.4)。换主题时宿主整表重灌,同一张表引用跟着变</td></tr>
+<tr><td class="nowrap"><code>ctx.doc</code></td><td>表</td><td>文档只读快照:<code>encoding</code> / <code>bom</code> / <code>eol</code> / <code>syntax</code> / <code>lines</code> / <code>read_only</code> / <code>modified</code> / <code>large</code>。<b>比 meta() 少一个 bytes</b>(总字节数要整表扫描,绘制档不付这个钱;真要字节走意图档的 <code>App.doc.meta()</code>)。没有快照时读字段得 nil,不用先判空</td></tr>
+<tr><td class="nowrap"><code>ctx.hot</code> / <code>ctx.active</code> / <code>ctx.pressed</code> / <code>ctx.disabled</code> / <code>ctx.checked</code> / <code>ctx.focus</code> / <code>ctx.selected</code> / <code>ctx.modified</code> / <code>ctx.alt</code></td><td>布尔</td><td>这一格的 9 个状态位(悬停 / 选中页签 / 按下 / 禁用 / 勾选 / 焦点 / 选中 / 内容改过 / 交替行)</td></tr>
+<tr><td class="nowrap"><code>ctx.rows</code></td><td>数组</td><td><b>仅 editor.overlay / editor.gutter</b>:可见行表,见 11.5</td></tr>
+<tr><td class="nowrap"><code>ctx.metrics</code></td><td>表</td><td><b>仅 editor.overlay / editor.gutter</b>:编辑器字体度量,见 11.5</td></tr>
+</table>
+
+<h3>11.5 编辑区专供:行表与度量</h3>
+<p><code>editor.overlay</code> 与 <code>editor.gutter</code> 的回调额外拿到两样东西。<b>这两个区域不进缓存</b>(输入是整屏行表,滚动一格、改一个字全都变),代价是每帧一次 Lua 调用 —— 别在回调里做重活。</p>
+<p><code>ctx.rows[i]</code> 的字段(数组从 1 起;<b>每读一次整张重建</b>,先 <code>local rows = ctx.rows</code> 拿一次):</p>
+<table>
+<tr><th>字段</th><th>类型</th><th>说明</th></tr>
+<tr><td><code>line</code></td><td>整数</td><td>逻辑行号,0 基</td></tr>
+<tr><td><code>y</code> / <code>h</code></td><td>数</td><td>该行整条折行带的顶边(相对编辑区客户区)与高度</td></tr>
+<tr><td><code>rows</code></td><td>整数</td><td>折了几段(没折是 1)</td></tr>
+<tr><td><code>display</code></td><td>整数</td><td>行号列显示的号,1 起(折叠之后与眼睛看到的一致)</td></tr>
+<tr><td><code>active</code></td><td>布尔</td><td>光标在这一行</td></tr>
+<tr><td><code>folded</code> / <code>foldable</code></td><td>布尔</td><td>折叠头且已折 / 能折未折</td></tr>
+<tr><td><code>bookmark</code></td><td>布尔</td><td>有书签</td></tr>
+<tr><td><code>icon</code></td><td>整数</td><td>行注记图标(0 = 无)</td></tr>
+<tr><td><code>state</code></td><td>整数</td><td>行修改状态:0 没改 / 1 改过未存 / 2 存过</td></tr>
+<tr><td><code>tilde</code></td><td>布尔</td><td>上一行没有行尾符(行号栏画 <code>~</code> 的那种行)</td></tr>
+<tr><td><code>eol</code></td><td>字符串</td><td>该行行尾符:<code>"CRLF"</code> / <code>"LF"</code> / <code>"CR"</code>;末行是 <code>""</code></td></tr>
+</table>
+<p><code>ctx.metrics</code> 的字段(全是本帧算好的值,不额外测量):</p>
+<table>
+<tr><th>字段</th><th>说明</th></tr>
+<tr><td><code>x_width</code> / <code>cjk_width</code></td><td>半角 / 全角字符宽度(等宽单元格)</td></tr>
+<tr><td><code>font_height</code> / <code>line_height</code></td><td>字体行高 / 含行距的一行步长</td></tr>
+<tr><td><code>gutter_x</code></td><td>gutter 整列宽度(正文从它右边开始)</td></tr>
+<tr><td><code>line_number_x</code> / <code>line_number_w</code></td><td>行号那一格的左缘与宽度;内置行号是「右留 3 px 再右对齐」,想对齐就用 <code>line_number_x + line_number_w - 3 - 位数 × x_width</code></td></tr>
+</table>
+<div class="box warn"><b>别在循环条件里读 ctx.rows / ctx.doc</b>这两个字段每次读取都新建 Lua 表:<code>for i = 1, #ctx.rows do ctx.rows[i] … end</code> 每圈重建一次。先 <code>local rows = ctx.rows</code>、<code>local d = ctx.doc</code>。</div>
+</section>
+
+<!-- ==================== 12 声明元素 ==================== -->
+<section class="chapter" id="layout">
+<h2>12 声明元素 App.ui.layout</h2>
+<p class="lead">管「有哪些东西」:停靠窗格、状态栏段、工具栏按钮。只声明结构,不带绘制 —— 画法另用 <code>ui.paint:on("区域名", …)</code>,点击行为另用 <code>click</code> / <code>App.command</code>。</p>
+
+<h3>12.1 停靠窗格 ui.layout:pane</h3>
+<pre><code>ui.layout:pane{ id = "clock", side = "left", title = "时钟", icon = 1325, size = 180, bar = 12 }
+ui.paint:on("pane.clock", function(c, ctx) ... return 1200 end)</code></pre>
+<table>
+<tr><th>字段</th><th>必填</th><th>默认</th><th>说明</th></tr>
+<tr><td><code>id</code></td><td>是</td><td>—</td><td>唯一名,非空;它同时是绘制区域名 <code>pane.&lt;id&gt;</code> 和 <code>ctx.part</code></td></tr>
+<tr><td><code>side</code></td><td>否</td><td><code>"bottom"</code></td><td><code>"left"</code> / <code>"right"</code> / <code>"top"</code> / <code>"bottom"</code>,写错当场报错</td></tr>
+<tr><td><code>title</code></td><td>否</td><td>= id</td><td>页签标题</td></tr>
+<tr><td><code>icon</code></td><td>否</td><td>0</td><td>页签图标:工具栏精灵格号,0 = 无图标</td></tr>
+<tr><td><code>size</code></td><td>否</td><td>0</td><td>这一侧的厚度(DIP);0 = 用停靠栏自己的记忆值</td></tr>
+<tr><td><code>bar</code></td><td>否</td><td>0</td><td>竖直滚动条轨道宽(DIP);0 = 不要轨道(滚轮仍可用)。负数夹到 0</td></tr>
+</table>
+<ul>
+<li>同名再声明一次是<b>覆盖</b>(热重载重跑整个文件不会叠出两块)。</li>
+<li><b>窗格是注册表的投影</b>:声明了它,宿主自建窗口、挂进停靠栏;声明被摘掉(停用包、卸载按需包)就当场拆窗口,加一块 / 删一块都不用重开进程。热重载改 <code>ui.paint:on("pane.clock", …)</code> 也是热的。</li>
+<li>窗格内容高不在这里声明:在画法里 <code>return 数字</code>(内容高画的时候才知道)。宿主拿它算滑块长度与最大滚动量。</li>
+<li>窗格获得焦点时,裸键快捷键也派发给脚本(见 7.3)。</li>
+</ul>
+
+<h3>12.2 状态栏段 ui.layout:status</h3>
+<pre><code>-- 读出内置那 13 段,末尾插一格自己的,再整条写回去
+local segs = ui.layout:defaults("status")
+table.insert(segs, {
+    id = "runtime", width = 70, priority = 10,
+    update = function()
+        -- 沙箱没有 os,拿不到墙上时间;App.now() 是宿主启动以来的毫秒数
+        return ("%.1f min"):format(App.now() / 60000)
+    end,
+})
+ui.layout:status(segs)</code></pre>
+<ul>
+<li><b>不带参数调一次是读</b>:返回当前声明(没声明过就是空表)。改完传回去。</li>
+<li><b>带参数是整条替换</b>,不是追加:声明了就<b>整条由脚本说了算</b>,内置字段一个都不画(除非用 <code>defaults()</code> 读出来加回去)。传空表 <code>{}</code> = 一段都不要,整条只剩底色。</li>
+<li>没声明的状态栏保持内置原样。</li>
+</ul>
+<table>
+<tr><th>段字段</th><th>默认</th><th>说明</th></tr>
+<tr><td><code>id</code></td><td>空</td><td>段名 = 绘制区域名 <code>status.&lt;id&gt;</code> 的后半截;空 id 的段只能是 <code>width="fill"</code>(那格只负责吃掉剩余宽度,没有内容可画)。同一整条里 id 重复当场报错</td></tr>
+<tr><td><code>text</code></td><td>空</td><td>内容模板(占位符见下表)</td></tr>
+<tr><td><code>update</code></td><td>无</td><td><code>function(ctx)</code> 返回一段文字(字符串 / 数字 / nil 都行),优先于 text。它运行在<b>绘制档</b>:能读 <code>ctx.doc</code>、<code>App.now()</code>,碰不到 <code>App.doc.*</code>。写 text 会摘掉 update、写 update 会摘掉 text(同一格的两条路)</td></tr>
+<tr><td><code>width</code></td><td><code>"auto"</code></td><td><code>"auto"</code>(按文字量)/ <code>"fill"</code>(吃掉剩余,一条最多一格,没写会自动在末尾补)/ 数字(固定 DIP)/ <code>{ min=, max= }</code>(夹在区间,给会变长的路径;两个都可省)</td></tr>
+<tr><td><code>priority</code></td><td>50</td><td>0..255,数字<b>越大越重要</b>,窗口窄了先丢小的</td></tr>
+<tr><td><code>click</code></td><td>空</td><td>点击这一格跑的命令名(脚本命令与内置命令都认)</td></tr>
+</table>
+<p>内容模板占位符(<code>text</code> 用;<code>%%</code> 输出百分号,其余不认识的字符直接报错):</p>
+<table>
+<tr><th>占位符</th><th>含义</th><th>占位符</th><th>含义</th></tr>
+<tr><td><code>%l</code> / <code>%c</code></td><td>光标行 / 列</td><td><code>%f</code> / <code>%F</code></td><td>文件名 / 完整路径</td></tr>
+<tr><td><code>%L</code> / <code>%p</code></td><td>总行数 / 百分比</td><td><code>%m</code> / <code>%r</code></td><td><code>[+]</code>(改过)/ <code>[RO]</code>(只读)</td></tr>
+<tr><td><code>%y</code> / <code>%e</code> / <code>%E</code></td><td>语法 / 行尾符 / 编码</td><td><code>%M</code></td><td>编辑模式(如「插入」)</td></tr>
+<tr><td><code>%S</code> / <code>%s</code></td><td>选区字符数 / 行数</td><td><code>%a</code></td><td>大文件标记</td></tr>
+</table>
+<p>内置的 13 段(<code>ui.layout:defaults("status")</code> 返回的就是它们):<code>message</code>(fill)、<code>filesize</code>、<code>sync</code>、<code>selection</code>、<code>syntax</code>、<code>tabsize</code>、<code>ln</code>、<code>col</code>、<code>char</code>、<code>lines</code>、<code>eol</code>、<code>editmode</code>、<code>encoding</code>。同名段继承内置那一格的点击行为;其余写法见 <code>click</code> 字段。</p>
+
+<h3>12.3 工具栏按钮 ui.layout:toolbar</h3>
+<pre><code>ui.layout:toolbar{ icon = 44, tip = "计时", command = "acme.tick", after = 0 }</code></pre>
+<ul>
+<li><b>追加</b>一个按钮,不是整条替换 —— 工具栏是用户自己的地盘,皮肤的按钮加在用户排布的末尾(或 <code>after</code> 指定的命令格后面)。</li>
+<li>不带参数调一次是读:返回已声明的那几个。</li>
+</ul>
+<table>
+<tr><th>字段</th><th>必填</th><th>默认</th><th>说明</th></tr>
+<tr><td><code>command</code></td><td>是</td><td>—</td><td>点下去跑的命令;空着当场报错 —— 点了没反应的按钮比没有按钮更糟</td></tr>
+<tr><td><code>icon</code></td><td>否</td><td>0</td><td>精灵格号(数字)</td></tr>
+<tr><td><code>tip</code></td><td>否</td><td>= command</td><td>悬停提示;空提示等于没提示</td></tr>
+<tr><td><code>after</code></td><td>否</td><td>0</td><td>插在哪个内置命令格后面(命令 id);0 = 末尾。写错不报错,退回末尾</td></tr>
+</table>
+
+<h3>12.4 运行时增删改:update / remove / list</h3>
+<table>
+<tr><th>调用</th><th>说明</th></tr>
+<tr><td class="nowrap"><code>ui.layout:update("种类.名字", { 字段 = 新值, … })</code></td><td>改一个<b>已声明过</b>的元素,不用整条重写。种类.名字:<code>pane.clock</code> / <code>status.clock</code> / <code>toolbar.acme.tick</code>(按第一个点切,所以 id 自己可以带点)。改不存在的元素当场报错</td></tr>
+<tr><td class="nowrap"><code>ui.layout:remove("种类.名字")</code></td><td>拆掉一个元素。窗格要重开进程才消失;状态段与工具栏按钮下一次重排就消失</td></tr>
+<tr><td class="nowrap"><code>ui.layout:list()</code></td><td>全部已声明元素,键就是 update / remove 收的那个名字</td></tr>
+</table>
+<p><code>update</code> 只收外壳真的会读的字段 —— 收下没人读的字段等于「改了没反应」:</p>
+<table>
+<tr><th>种类</th><th>能改的字段</th></tr>
+<tr><td><code>pane</code></td><td><code>side</code> <code>title</code> <code>icon</code> <code>size</code> <code>bar</code>(id 是身份,改不了)</td></tr>
+<tr><td><code>status</code></td><td><code>text</code> <code>update</code> <code>width</code> <code>priority</code> <code>click</code></td></tr>
+<tr><td><code>toolbar</code></td><td><code>icon</code> <code>tip</code>(command 是身份、after 是位置 —— 换按钮用 remove + 重声明)</td></tr>
+</table>
+<div class="box note"><b>这是「推」模型</b>元素状态变了才调一次 <code>update</code>(事件里、命令里),不要拿定时器轮询刷文字 —— 定时器 + <code>update</code> 函数各管各的,拼在一起只会多跑。</div>
+</section>
+
+<!-- ==================== 13 点击与悬停 ==================== -->
+<section class="chapter" id="press">
+<h2>13 点击与悬停</h2>
+<p class="lead">页签、脚本窗格可以整体接管点击;任何区域可以声明悬停指针。</p>
+
+<h3>13.1 点击:App.ui.on / App.ui.off</h3>
+<pre><code>App.ui.on("tab", "rclick", function()
+    App.run("file.close")
+    return true            -- 接管:内置右键菜单不再弹
+end)
+App.ui.off("tab", "rclick")</code></pre>
+<table>
+<tr><th>项</th><th>说明</th></tr>
+<tr><td>事件名</td><td>只有 <code>"press"</code>(左键)与 <code>"rclick"</code>(右键);写错当场报错</td></tr>
+<tr><td>已接线的区域</td><td><code>tab</code>(左 / 右)、<code>pane.&lt;id&gt;</code>(左 / 右;来自 12.1 声明的窗格)。其它区域可以注册但当前外壳不会来问</td></tr>
+<tr><td>返回值</td><td><code>true</code> = 接管,内置动作(切页签、弹菜单)不再执行;<code>false</code> / <code>nil</code> = 看过了,让内置的照做;抛错按「没接管」记日志 —— 页签不能因为坏皮肤点不动</td></tr>
+<tr><td>执行档</td><td><b>意图档</b>(点击发生在鼠标消息里,编辑器状态没被借走):回调里 <code>App.doc.*</code>、<code>App.run</code>、<code>print</code> 都能用</td></tr>
+<tr><td>缓存</td><td>回调返回后该区域的绘制缓存整区丢弃 —— handler 可能改了画法要用的状态;命令 / 事件 / 定时器里改状态则自己调 <code>App.ui.repaint(区域名)</code></td></tr>
+</table>
+<p>回调参数是一个 <code>ctx</code>(与画法同一个 userdata):这一格的 <code>ctx.rect</code>、状态位(<code>ctx.hot</code> 等)可用来判断点在了哪里。</p>
+
+<h3>13.2 悬停:ui.paint:hint</h3>
+<pre><code>ui.paint:hint("tab", { cursor = "hand", tip = "点我切换" })
+ui.paint:unhint("tab")</code></pre>
+<ul>
+<li><code>cursor</code>:12 个指针名之一 —— <code>arrow</code> / <code>ibeam</code> / <code>hand</code> / <code>cross</code> / <code>size_ns</code> / <code>size_we</code> / <code>size_nwse</code> / <code>size_nesw</code> / <code>size_all</code> / <code>wait</code> / <code>appstarting</code> / <code>no</code>。写错当场报错(不静默退回箭头)。</li>
+<li><code>tip</code>:只有 <code>tab</code>、<code>dock.tab</code>、<code>pane.&lt;id&gt;</code> 收提示 —— 工具栏的提示归控件(按命令说明问)、状态栏在文字放不下时自己弹,那两处再挂一条就是两个框叠在一起;在别的区域给 tip 当场报错。</li>
+<li>悬停声明是<b>纯数据</b>(不是回调):指针每秒问几十次,这里不进 Lua、没有开销,也写不了死循环。</li>
+</ul>
+</section>
+
+<!-- ==================== 14 运行时外观 ==================== -->
+<section class="chapter" id="style">
+<h2>14 运行时外观 App.ui.style</h2>
+<p class="lead">在运行时把主题的颜色、度量、形状、字体盖掉一层。写法和主题文件四段一一对应,<b>值传 nil 就是复位</b>(回到主题给的那个);名字写错当场报错并列出全部合法名。</p>
+
+<h3>14.1 四段四个动词</h3>
+<table>
+<tr><th>主题文件</th><th>脚本写法</th></tr>
+<tr><td><code>[Theme] tab.mark=#E67E22</code></td><td class="nowrap"><code>style:set("tab.mark", "#E67E22")</code></td></tr>
+<tr><td><code>[Metrics] status.height=26</code></td><td class="nowrap"><code>style:metric("status.height", 26)</code></td></tr>
+<tr><td><code>[Shape] tab.states.active.radius=0</code></td><td class="nowrap"><code>style:shape("tab", "active", "radius", 0)</code></td></tr>
+<tr><td><code>[Fonts] mono.face=Consolas</code></td><td class="nowrap"><code>style:font("mono", { face = "Consolas" })</code></td></tr>
+</table>
+
+<h3>14.2 颜色:set / reset / get / list</h3>
+<table>
+<tr><th>调用</th><th>说明</th></tr>
+<tr><td class="nowrap"><code>style:set(token, "#RRGGBB")</code></td><td>覆盖一个颜色 token;传 <code>nil</code> 等于 reset</td></tr>
+<tr><td class="nowrap"><code>style:reset(token)</code></td><td>拿掉覆盖,回到主题值</td></tr>
+<tr><td class="nowrap"><code>style:get(token)</code></td><td>当前生效值(覆盖优先,否则主题值);不认识的名字返回 nil</td></tr>
+<tr><td class="nowrap"><code>style:list()</code></td><td>只列<b>被改过</b>的 token;想知道全部生效值用 <code>App.theme.list()</code></td></tr>
+</table>
+<h3>14.3 度量 / 形状 / 字体</h3>
+<table>
+<tr><th>组</th><th>写</th><th>读回</th></tr>
+<tr><td>度量</td><td class="nowrap"><code>style:metric(名, 数|nil)</code></td><td class="nowrap"><code>style:metrics()</code> → 改过的,<code>名 = 数</code></td></tr>
+<tr><td>形状</td><td class="nowrap"><code>style:shape(区域, 状态|nil, 键, 值|nil)</code></td><td class="nowrap"><code>style:shapes()</code> → <code>["tab.states.active.radius"] = 0</code></td></tr>
+<tr><td>字体</td><td class="nowrap"><code>style:font(token, { face=, size=, weight=, italic= })</code><br><code>style:font(token, "size", 12)</code>(单字段;清一个字段只能用它)<br><code>style:font(token, nil)</code>(整条复位)</td><td class="nowrap"><code>style:fonts()</code> → <code>["mono.face"] = "Consolas"</code></td></tr>
+</table>
+<ul>
+<li><b>形状的区域名认家族</b>:<code>status</code> 展开成 <code>status.pane</code> + <code>status.grip</code>,<code>scroll</code> → 两根滚动条,<code>menu</code> → 菜单两区 —— 与主题文件同一套展开规则,两边同一个词是同一件事。状态名 9 个:<code>hot</code> / <code>active</code> / <code>pressed</code> / <code>disabled</code> / <code>checked</code> / <code>focus</code> / <code>selected</code> / <code>modified</code> / <code>alt</code>(大小写不敏感,统一成小写存)。形状键 5 个:<code>radius</code> / <code>gap</code> / <code>border</code> / <code>pad_y</code> / <code>font</code> —— 只有 <code>font</code> 收字符串(如 <code>style:shape("tab", nil, "font", "font.mono")</code>),其余必须数字。</li>
+<li><b>度量名 13 个</b>:<code>status.height</code> / <code>status.pad</code> / <code>status.icon_pad</code> / <code>status.min_w</code> / <code>split.band_h</code> / <code>split.band_v</code> / <code>tab.height</code> / <code>tab.pad_x</code> / <code>tab.close</code> / <code>dock.tab.height</code> / <code>menu.row_h</code> / <code>menu.pad</code> / <code>toolbar.icon</code>。</li>
+<li><b>字体 token 6 个</b>:<code>ui</code> / <code>mono</code> / <code>tab</code> / <code>status</code> / <code>menu</code> / <code>pane</code>;字段 <code>face</code>(字面名)/ <code>size</code>(数字 pt)/ <code>weight</code>(100..900 或 <code>"normal"</code>=400、<code>"bold"</code>=700)/ <code>italic</code>(布尔)。补丁是<b>按字段</b>盖在主题值上的:只改字号不动字面。越界的数字盖上去时夹取。</li>
+<li>改完是「下一次重画就对了」;复位也照样触发重画。<code>style:metrics()</code> / <code>shapes()</code> / <code>fonts()</code> 的输出<b>原样贴回主题文件</b>就变成永久的 —— 调试脚本就是主题文件的设计台。</li>
+</ul>
+<h3>14.4 只读主题 App.theme 与 89 个 token</h3>
+<table>
+<tr><th>调用</th><th>说明</th></tr>
+<tr><td class="nowrap"><code>App.theme.name()</code></td><td>当前主题名(宿主合成主题时推给脚本)</td></tr>
+<tr><td class="nowrap"><code>App.theme.color(token)</code></td><td>一个 token 的生效值(含脚本覆盖)</td></tr>
+<tr><td class="nowrap"><code>App.theme.list()</code></td><td>全部 89 个 token 的生效值</td></tr>
+</table>
+<p>全部颜色 token(绘制回调里用 <code>ctx.theme["…"]</code> 读同一份):</p>
+<table>
+<tr><th>组</th><th>token</th></tr>
+<tr><td>编辑区</td><td class="nowrap" style="white-space:normal"><code>editor.bg</code> <code>editor.fg</code> <code>editor.caret</code> <code>editor.caret_glow</code> <code>editor.caret_indicator</code> <code>editor.selection</code> <code>editor.current_line</code> <code>editor.below</code> <code>editor.margin</code> <code>editor.indent_line</code> <code>editor.boundary</code> <code>editor.whitespace</code> <code>editor.ruler</code> <code>editor.minimap_viewport</code> <code>editor.line_modified</code> <code>editor.line_saved</code> <code>editor.bookmark</code> <code>editor.tag</code> <code>editor.pair</code> <code>editor.found_bg</code> <code>editor.found_fg</code> <code>editor.url_bg</code> <code>editor.url_fg</code> <code>editor.email_bg</code> <code>editor.email_fg</code> <code>editor.word2_bg</code> <code>editor.word2_fg</code> <code>editor.conchar_bg</code> <code>editor.conchar_fg</code></td></tr>
+<tr><td>gutter</td><td class="nowrap"><code>editor.gutter.bg</code> <code>editor.gutter.fg</code> <code>editor.gutter.folding_bg</code> <code>editor.gutter.folding_fg</code> <code>editor.gutter.icon_bg</code> <code>editor.gutter.icon_fg</code></td></tr>
+<tr><td>标记 0–7</td><td class="nowrap"><code>editor.marker0.bg</code> … <code>editor.marker7.bg</code> 与对应的 <code>editor.marker0.fg</code> … <code>editor.marker7.fg</code>(16 个)</td></tr>
+<tr><td>弹窗</td><td class="nowrap"><code>popup.bg</code> <code>popup.fg</code></td></tr>
+<tr><td>滚动条</td><td class="nowrap"><code>scroll.bg</code> <code>scroll.thumb</code> <code>scroll.thumb_hover</code> <code>scroll.arrow</code></td></tr>
+<tr><td>状态栏</td><td class="nowrap"><code>status.bg</code> <code>status.fg</code> <code>status.divider</code></td></tr>
+<tr><td>停靠面板</td><td class="nowrap"><code>panel.bg</code> <code>panel.fg</code> <code>panel.hover</code> <code>panel.active</code> <code>panel.match</code></td></tr>
+<tr><td>菜单</td><td class="nowrap"><code>menu.bg</code> <code>menu.fg</code> <code>menu.hover</code> <code>menu.disabled</code> <code>menu.separator</code></td></tr>
+<tr><td>工具栏</td><td class="nowrap"><code>toolbar.bg</code> <code>toolbar.border</code> <code>toolbar.field</code> <code>toolbar.button.fg</code> <code>toolbar.button.disabled</code> <code>toolbar.button.hot</code> <code>toolbar.button.selected</code> <code>toolbar.button.frame</code></td></tr>
+<tr><td>页签</td><td class="nowrap"><code>tabstrip.bg</code> <code>tab.active_bg</code> <code>tab.frame</code> <code>tab.mark</code> <code>tab.hot_band</code> <code>tab.fg</code> <code>tab.active_fg</code> <code>tab.glyph.fg</code> <code>tab.glyph.hover</code> <code>tab.glyph.pressed</code> <code>tab.glyph.disabled</code></td></tr>
+</table>
+</section>
+
+<!-- ==================== 15 脚本包 ==================== -->
+<section class="chapter" id="packages">
+<h2>15 脚本包</h2>
+<p class="lead">一个包 = 一个目录 + 一份可选的 <code>package.toml</code>。清单只回答五件事:我是谁、要什么版本、依赖谁、按什么顺序跑、什么时候跑。</p>
+
+<h3>15.1 package.toml 全解</h3>
+<pre><code>api = 1                          # 必填;只有 1 被接受
+id = "luapaint"                  # 必填,见下方规则
+name = "LuaPaint"                # 显示名,可省(缺省用 id)
+version = "1.0.0"                # 可省
+description = "…"                # 可省
+order = 90                       # 同依赖层内的装载顺序,小的先装;可省,缺省 0
+requires = ["acme.base &gt;= 1.2"]  # 依赖;可省。只认 &gt;=,别的比较符不收
+launch = "贪吃蛇(&amp;S)"        # 可省;写了 = 按需启动,值是「扩展」菜单那一行的文字
+scripts = ["paint.lua", "panels.lua"]  # 可省;缺省 = 目录下所有 *.lua 按文件名排序</code></pre>
+<ul>
+<li><b>id 规则</b>:小写字母或数字开头,只含 <code>a-z 0-9 . _ -</code>,≤ 64 字符,不能有 <code>..</code> —— 它会变成目录名、命令前缀、存储目录名。</li>
+<li><code>scripts</code> 必须是包目录内的相对路径,不许跳出;写了就按写的顺序跑,<b>哪些文件会跑是个能打印出来的事实</b>。</li>
+<li><code>launch</code> 必须是非空字符串。空串、纯空白、布尔、数字一律<b>报错</b>,不静默退回「开机装载」—— 作者以为关掉了自动装载、结果脚本照跑是最难查的一种。值里的 <code>&amp;</code> 是菜单加速键。</li>
+<li>清单里写 <code>kind</code> / <code>facets</code> / <code>permissions</code> 会<b>报错</b>而不是忽略:包不分级,什么脚本都能建元素、画画、改文档;真正的约束在回调签名上(画法必须纯、点击回调返回意图)。</li>
+<li><code>requires</code> 里的 <code>dogedit</code> 指宿主本身,版本就是程序版本(当前 0.1.0);被依赖包缺了或版本不够,这个包装不上,原因会写进管理器与 <code>--packages</code> 报告。</li>
+<li>单个脚本文件失败<b>不带走整包</b>:后面的文件可能正是补它的那个。</li>
+</ul>
+
+<h3>15.2 按需启动:点菜单装载,关窗格退出</h3>
+<p>不写 <code>launch</code> 的包随启动装载。写了 <code>launch</code> 的包是<b>按需启动包</b>,开机一条脚本都不跑:<code>loaded_scripts</code> 里没有它、心跳定时器不会为它 arm、扩展菜单里也只有它自己那一行(不会给包内每条 <code>App.command</code> 各占一行)。</p>
+<ul>
+<li><b>启动</b>:点「扩展 → 菜单文字」(id 段 35500+)。宿主按清单顺序跑这个包的脚本,走和开机装载同一套收尾 —— <code>ui.layout:pane</code> 当场建出真 HWND 并停靠,心跳定时器当场 arm,<code>App.run</code> 排的队当场派发。菜单那行随即变成「关闭 …」。</li>
+<li><b>退出</b>:关掉它带的<b>最后一块</b>脚本窗格(窗格 ✕、双击页签、1284),或者再点一次那行菜单。宿主 <code>purge_package</code> 把十项注册(事件/命令/快捷键/画法/按下/悬停/窗格/状态段/工具栏/定时器)、待办队列、画布缓存一次摘净,跑满两轮 Lua GC,再拆窗格、重算定时器、重建菜单。</li>
+<li><b>包里有好几块窗格时</b>,关一块只收那一块;等最后一块也关了才整包退出。没声明窗格的按需包只能从菜单那行退出。</li>
+<li><b>内部命令不上菜单</b>:按需包里 <code>App.command</code> 注册的命令照样能被 <code>App.keymap</code> / <code>ui.on</code> / <code>App.run</code> 调用,只是不列进「扩展」菜单。小游戏的方向键、暂停、重开不该一人占八行。</li>
+<li><code>--ui-doctor</code> 仍会把按需包真跑一遍做语法/装载校验(报告里单列「按需启动」),但它<b>不代表开机装载</b>;<code>--packages</code> 报告也单列一段。</li>
+</ul>
+<div class="box note">按需包与「停用」是两件事:停用写进 <code>[Scripts] Disabled</code>,菜单里那行直接消失;启用只让那行回来,不会顺手把游戏跑起来。<code>App.ui.style</code> 的运行时外观覆盖是进程级的,按需包退出时不会自动复位 —— 要改外观请在脚本里自己 <code>reset</code>。</div>
+
+<h3>15.3 装载顺序与启停</h3>
+<ul>
+<li>三个根目录(exe 目录 → 用户目录 → 工作目录)全部扫描,<b>同 id 后面的根胜</b>;散装脚本(<code>scripts\*.lua</code>)作为无清单的「包」一起进队列。</li>
+<li>排序:先按宿主版本筛,再按 <code>requires</code> 拓扑排,同层内按 <code>order</code>、最后按 id。</li>
+<li>停用的包(<code>setting.ini</code> 的 <code>[Scripts] Disabled=</code>)根本不进装载循环 —— 既不排序也不跑。写了 <code>launch</code> 的按需包同样不进循环,只在「扩展」菜单留一行。</li>
+<li>按需包被点开之后,它的文件才进 <code>loaded_scripts</code>,此后热重载、心跳定时器、管理器状态列都把它当「在跑」;退出时再从这张表里摘掉。</li>
+</ul>
+
+<h3>15.4 管理对话框</h3>
+<p>「工具 → 设置 → 脚本包…」打开「脚本包」对话框:</p>
+<ul>
+<li>带勾选框的表:包 / 版本 / 来源(随包 / 用户 / 开发 / 散装)/ 状态(已启用 / 已停用 / 被同名覆盖 / 装载失败:原因)/ 脚本;底部显示选中包的目录;「全选 / 全不选 / 打开目录 / 确定 / 取消」。</li>
+<li>勾选变化<b>当场生效</b>:停用 = 把该包登记的全部东西(画法、事件、命令、快捷键、定时器、窗格、状态段、工具栏按钮)一次清干净,窗格当场拆掉,屏幕立即回到内置画法;启用 = 立刻按依赖顺序重跑。<b>按需包</b>启用只让菜单那一行回来,状态列写「按需启动(点扩展菜单)」或「运行中(按需启动)」。</li>
+<li>清单读不出来的包不进表(勾了也跑不了),只在摘要里报个数;细节用 <code>--ui-doctor</code> 查。</li>
+</ul>
+
+<h3>15.5 依赖与冲突的排查</h3>
+<p>装载失败集中在三处能看:启动时那个汇总弹窗(最多 5 条)、日志(逐条带路径与原因)、以及命令行报告(第 16 章)。<code>requires</code> 不满足、id 不合规、<code>api</code> 不是 1、<code>launch</code> 写成空串或布尔、TOML 语法错、<code>scripts</code> 指到不存在的文件,各有各的一句人话。</p>
+</section>
+
+<!-- ==================== 16 命令行与诊断 ==================== -->
+<section class="chapter" id="cli">
+<h2>16 命令行与诊断</h2>
+<p class="lead">诊断开关都不开窗:报告打在控制台,退出码可作 CI 闸门。</p>
+<table>
+<tr><th>命令</th><th>做什么</th></tr>
+<tr><td class="nowrap"><code>dogedit --packages</code></td><td>只看清单:扫到的包、能不能装上、按什么顺序装(不开窗、不跑脚本)</td></tr>
+<tr><td class="nowrap"><code>dogedit --ui-doctor</code><br><code>dogedit --ui-doctor --strict</code></td><td>把包<b>真装一遍</b>(无窗口宿主)再把每份主题四段过一遍,回答「这台机器上到底哪里有问题」。提醒默认不算失败;<code>--strict</code> 把提醒也算错</td></tr>
+<tr><td class="nowrap"><code>dogedit --ui-lint 脚本.lua</code></td><td>不开窗,用无头宿主跑<b>单个</b>脚本文件:语法错、画法抛错、每条画法的产出都能看到(<code>App.prompt</code> 在这一档返回 nil)</td></tr>
+<tr><td class="nowrap"><code>dogedit --skin-debug</code><br>或环境变量 <code>DOGEDIT_SKIN_DEBUG=1</code></td><td>正常开窗,但每个绘制回调连跑两遍逐条比对指令(抓「不纯」画法),一处只报一次;退出时打总账:副作用处数、绘制缓存命中率、因读 <code>App.now()</code> 不进缓存的次数</td></tr>
+<tr><td class="nowrap"><code>dogedit --safe-mode</code></td><td>安全模式:脚本<b>一条都不跑</b>(宿主照建)。闯祸的包从「脚本包」对话框勾掉,名单照写、装载留到下次正常启动</td></tr>
+</table>
+<div class="box note"><b>日志看哪里</b><code>App.log</code> / <code>print</code> / 报错都带 <code>[lua] </code> 前缀走两条路:stderr(从终端启动、或重定向到文件)与 <code>OutputDebugString</code>(挂调试器可见)。绘制期的日志走同一条路 —— 画不出来的时候先看这里。</div>
+</section>
+
+<!-- ==================== 17 沙箱与限制汇总 ==================== -->
+<section class="chapter" id="limits">
+<h2>17 沙箱与限制汇总</h2>
+<p class="lead">脚本跑在一个受限的 Lua 5.4 状态里。这张表是全部边界的速查。</p>
+
+<h3>17.1 沙箱边界</h3>
+<table>
+<tr><th>项</th><th>状态</th></tr>
+<tr><td>标准库</td><td>只有 <b>coroutine / table / string / math / utf8</b></td></tr>
+<tr><td><code>os</code> / <code>io</code> / <code>package</code> / <code>debug</code></td><td>不存在(取不到时间、文件、加载器、调试钩子)</td></tr>
+<tr><td>文件 I/O</td><td>没有;唯一持久化是 <code>App.storage</code>(落到固定 JSON)</td></tr>
+<tr><td>时间</td><td>唯一来源 <code>App.now()</code>(宿主启动以来的毫秒);<b>拿不到墙上时间</b></td></tr>
+<tr><td>全局变量</td><td>读穿透到标准库,写只影响脚本自己</td></tr>
+<tr><td>网络 / 进程 / 注册表</td><td>没有</td></tr>
+</table>
+
+<h3>17.2 数值上限</h3>
+<table>
+<tr><th>量</th><th>上限 / 范围</th></tr>
+<tr><td>Lua 堆内存</td><td>64 MB</td></tr>
+<tr><td>指令预算</td><td>绘制回调 / 状态栏 update:20 万条;事件、命令、定时器、点击、装载:2000 万条</td></tr>
+<tr><td>定时器</td><td>同时存活 ≤ 64;周期 1 ms .. 24 h;一轮最多发 64 个;报错的当场注销</td></tr>
+<tr><td>待办队列</td><td>≤ 256 件,入队与派发两道都挡</td></tr>
+<tr><td>命令名</td><td>1..128 字符</td></tr>
+<tr><td>存储表名</td><td>1..64 字符;值只能是字符串</td></tr>
+<tr><td>快捷键</td><td>Ctrl / Shift / Alt + 字母、数字、F1..F12 或方向键 / 空格等具名键;单键,无和弦,合法名见 7.3</td></tr>
+<tr><td>窗格 / 状态段 id</td><td>字母数字 <code>_</code> <code>-</code>,≤ 40 字节;状态段 priority 0..255</td></tr>
+<tr><td>颜色</td><td>必须 <code>#RRGGBB</code> 正好 6 位</td></tr>
+<tr><td>单次编辑</td><td>大文件模式下单次脚本改动 ≤ 800 万字符(撤销快照上限)</td></tr>
+</table>
+
+<h3>17.3 常见报错速查</h3>
+<table>
+<tr><th>报错(节选原文)</th><th>原因与处置</th></tr>
+<tr><td><code>script exceeded its instruction budget (N instructions)</code></td><td>死循环或计算量过大;按档位对照 17.2 的预算</td></tr>
+<tr><td><code>not enough memory</code></td><td>堆超 64 MB(常见于每帧拼大字符串的皮肤)</td></tr>
+<tr><td><code>no bridge: called outside a host entry point</code></td><td>绘制回调里调了 <code>App.doc.*</code> 等意图档 API —— 绘制档没给这些工具</td></tr>
+<tr><td><code>bad gesture …: want Ctrl/Shift/Alt + letter, digit, F1-F12, or one of Up/Down/Left/Right/Space/Enter/Esc/Tab/Backspace/Insert/Delete/Home/End/PageUp/PageDown</code></td><td>快捷键写法不合法</td></tr>
+<tr><td><code>too many timers (max 64)</code></td><td>定时器没 cancel 就一直登记;重载会清,循环里不会</td></tr>
+<tr><td><code>App.run: no command "…"</code></td><td>命令名写错,或该命令既不是脚本命令也不在内置表</td></tr>
+<tr><td><code>… 不是 token 名(共 89 个,形如 tab.mark / status.bg / scroll.thumb)</code></td><td>颜色 token 拼错,报错里给了写法样例</td></tr>
+<tr><td><code>… 不是度量名 / 不是区域 / 不是形状键 / 不是字体 token</code></td><td>同类拼错;报错会列出全部合法名</td></tr>
+<tr><td><code>ui.layout:status 里 "x" 出现了两次…</code></td><td>段名重复 —— 段名同时是绘制区域名,重名会共用缓存</td></tr>
+<tr><td><code>ui.layout: 没有 pane.x 这个元素 —— 先声明它,再改它</code></td><td>update / remove 之前没 pane 过</td></tr>
+<tr><td><code>taskbar state must be none, indeterminate, normal, error or paused</code></td><td><code>App.taskbar</code> 的状态名写错;合法名与别名见 5.1</td></tr>
+<tr><td><code>taskbar total must be &gt; 0</code></td><td><code>App.taskbar</code> 的总量不能是 0</td></tr>
+<tr><td><code>… does not take a tip …</code></td><td>给工具栏 / 状态栏挂悬停提示 —— 那两处的提示归控件</td></tr>
+</table>
+</section>
+
+<!-- ==================== 18 示例集 ==================== -->
+<section class="chapter" id="recipes">
+<h2>18 示例集</h2>
+<p class="lead">八个从「几行」到「一整个窗格」的完整示例,全部可直接跑。仓库示例 <code>packages\luapaint\</code> 是更完整的写法参考,<code>packages\snake\</code> 是用窗格 / 定时器 / 具名键做的贪吃蛇;两者都只在仓库里,不进发布包。</p>
+
+<h3>18.1 保存时自动去行尾空白</h3>
+<pre><code>App.on("doc.saved", function()
+    local n = 0
+    for i = 1, App.doc.line_count() do
+        local t = App.doc.line(i)
+        local keep = t:match("^(.*%S)") or ""
+        if #keep &lt; #t then
+            App.doc.replace(i, #keep + 1, i, #t + 1, "")
+            n = n + 1
+        end
+    end
+    if n &gt; 0 then App.log(("trimmed %d lines after save"):format(n)) end
+end)</code></pre>
+
+<h3>18.2 注册一个菜单命令并绑键</h3>
+<pre><code>App.command("acme.upper", function()
+    local t = App.sel.text()
+    if #t == 0 then App.alert("先选中一段文字") return end
+    local sl, sc, el, ec = App.sel.get()
+    App.doc.replace(sl, sc, el, ec, t:upper())
+end)
+App.keymap("Ctrl+Alt+U", "acme.upper")</code></pre>
+<p>「扩展」菜单底部出现 <b>Lua: acme.upper</b>;在编辑器里 <kbd>Ctrl+Alt+U</kbd> 触发。</p>
+
+<h3>18.3 单行输入:批量插入</h3>
+<pre><code>App.command("acme.rule", function()
+    local n = tonumber(App.prompt("插入几行分隔线?", "3")) or 0
+    if n &lt; 1 or n &gt; 50 then return end
+    local caret = App.view.info()
+    App.doc.insert(caret.caret_line + 1, 1, ("-"):rep(40) .. ("\n" .. ("-"):rep(40)):rep(n - 1))
+end)</code></pre>
+
+<h3>18.4 持久计数器</h3>
+<pre><code>local db = App.storage("acme.stats")
+App.on("doc.saved", function()
+    db.set("saves", tostring((tonumber(db.get("saves")) or 0) + 1))
+end)
+App.command("acme.showstats", function()
+    App.alert(("saves = %s, last = %s"):format(db.get("saves") or "0", db.get("last") or "-"))
+    db.set("last", App.doc.name())
+end)</code></pre>
+
+<h3>18.5 状态栏加一格:跟随 EOL 换色</h3>
+<pre><code>local ui = App.ui
+local segs = ui.layout:defaults("status")          -- 内置 13 段先拿回来
+table.insert(segs, { id = "eol2", width = 44, text = "%e" })
+ui.layout:status(segs)                             -- 整条写回
+
+ui.paint:on("status.eol2", function(c, ctx)
+    local ink = ctx.doc.eol == "CRLF" and "#FF8A65" or "#7FD1B9"
+    c:gradient(ctx.rect, "#16212B", "#0E151B", "v")
+    c:text(ctx.rect:inset(8, 0), "@text", ink, { valign = "middle", ellipsis = true })
+    return true
+end)</code></pre>
+<p>画法里只画「这一格」;文字用 <code>@text</code> 占位符,宿主负责把模板展开。</p>
+
+<h3>18.6 一块自己的停靠窗格:秒表</h3>
+<pre><code>local ui = App.ui
+ui.layout:pane{ id = "stopwatch", side = "right", title = "秒表", size = 160, bar = 10 }
+
+local t0 = nil                                    -- nil = 没在计时
+ui.paint:on("pane.stopwatch", function(c, ctx)
+    c:fill(ctx.rect, "#10161C")
+    local elapsed = (t0 and App.now() - t0 or 0) / 1000
+    local big = { font = "mono", align = "center", valign = "top" }
+    c:text(ctx.rect:inset(8, 12), ("%6.1f s"):format(elapsed), "#E6EDF3", big)
+    c:text(ctx.rect:move(0, 60):inset(8, 0), t0 and "计时中… 点击停止" or "点击开始", "#8B949E",
+           { align = "center" })
+    return true                                    -- 返回 true:整块自己画
+end)
+
+App.ui.on("pane.stopwatch", "press", function()
+    t0 = t0 and nil or App.now()                   -- 走停切换
+    return true
+end)</code></pre>
+<p>点击回调改了画法要用的状态(<code>t0</code>),宿主会自动丢弃该区域缓存,下一帧重算 —— 不用自己刷新。</p>
+
+<h3>18.7 保存后把页签标记点亮一会儿</h3>
+<pre><code>local until_ms = 0
+local lit = false
+App.on("doc.saved", function()
+    until_ms = App.now() + 1200
+    if not lit then
+        lit = true
+        App.ui.style:set("tab.mark", "#E67E22")    -- 点亮一次就够
+    end
+end)
+App.timer(300, function()                          -- 心跳负责"熄灭"
+    if lit and App.now() &gt; until_ms then
+        lit = false
+        App.ui.style:reset("tab.mark")             -- 回到主题给的那个
+    end
+end, true)</code></pre>
+
+<h3>18.8 给可见行画「超长行」底色(editor.overlay)</h3>
+<pre><code>local ui = App.ui
+ui.paint:on("editor.overlay", function(c, ctx)
+    local rows = ctx.rows                          -- 先拿一次,别在循环里读
+    local m = ctx.metrics
+    if not rows or not m then return false end     -- 没挂行表就交回内置
+    for i = 1, #rows do
+        local r = rows[i]
+        if r.rows &gt; 3 then                         -- 折了 3 段以上的行
+            c:fill({ x = m.gutter_x, y = r.y, w = ctx.w - m.gutter_x, h = r.h }, "#2A1E10")
+        end
+    end
+    return true
+end)</code></pre>
+<div class="box warn"><b>overlay 回调里别干重活</b>这一档不进缓存,每帧都会跑:别 <code>App.doc.line()</code>(那是意图档 API,这里也调不了),只按 <code>ctx.rows</code> 给的字段画。</div>
+</section>
+
+<script>
+(function(){
+  var input=document.getElementById('tocsearch');
+  if(!input)return;
+  input.addEventListener('input',function(){
+    var q=input.value.trim().toLowerCase();
+    document.querySelectorAll('#toc a').forEach(function(a){
+      var hit=!q||a.textContent.toLowerCase().indexOf(q)>=0;
+      a.parentElement.classList.toggle('dim',!hit);
+    });
+    document.querySelectorAll('#toc>ol>li').forEach(function(li){
+      var visible=false;
+      li.querySelectorAll('a').forEach(function(a){if(!a.parentElement.classList.contains('dim'))visible=true;});
+      li.classList.toggle('dim',!visible);
+    });
+  });
+})();
+
+(function(){
+  var KEY='dg-manual-theme';
+  var btn=document.getElementById('themebtn');
+  if(!btn)return;
+  var MODES=['auto','light','dark'];
+  var LABEL={auto:'\u25d0 \u4e3b\u9898:\u8ddf\u968f\u7cfb\u7edf',light:'\u2600 \u4e3b\u9898:\u6d45\u8272',dark:'\u263e \u4e3b\u9898:\u6df1\u8272'};
+  var cur=document.documentElement.getAttribute('data-theme')||'auto';
+  if(MODES.indexOf(cur)<0)cur='auto';
+  function apply(){
+    document.documentElement.setAttribute('data-theme',cur);
+    btn.textContent=LABEL[cur];
+    try{localStorage.setItem(KEY,cur);}catch(e){}
+  }
+  btn.addEventListener('click',function(){
+    cur=MODES[(MODES.indexOf(cur)+1)%MODES.length];
+    apply();
+  });
+  apply();
+})();
+</script>
+</main>
+</div>
+</body>
+</html>

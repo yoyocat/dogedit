@@ -1,0 +1,32 @@
+#title=HTML
+
+#t=Document
+#g=html5
+<!DOCTYPE html>
+<html lang="${1:en}">
+<head>
+	<meta charset="utf-8">
+	<title>${2:Title}</title>
+</head>
+<body>
+	${0}
+</body>
+</html>
+
+#t=Division
+#g=div
+<div class="${1:name}">
+	${0}
+</div>
+
+#t=Link
+#g=a
+<a href="${1:url}">${2:text}</a>
+
+#t=Script
+#g=script
+<script src="${1:file.js}"></script>
+
+#t=Input
+#g=input
+<input type="${1:text}" name="${2:name}" id="${2:name}">

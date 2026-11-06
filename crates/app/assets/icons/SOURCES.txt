@@ -1,0 +1,123 @@
+Tabler Icons 3.50.0 — https://tabler.io/icons
+Source: https://cdn.jsdelivr.net/npm/@tabler/icons-png@3.50.0/icons/<style>/<name>.png
+Each atlas cell is one export scaled to the cell size with a Lanczos filter.
+Filled variants used: player-play, player-record, star
+
+Icons:
+  0 align-center
+  1 align-left
+  2 align-right
+  3 app-window
+  4 archive
+  5 arrow-back-up
+  6 arrow-bar-left
+  7 arrow-bar-right
+  8 arrow-forward-up
+  9 arrow-left
+ 10 arrow-merge
+ 11 arrow-right
+ 12 arrows-exchange
+ 13 backspace
+ 14 binary
+ 15 binary-off
+ 16 bookmark
+ 17 bookmark-off
+ 18 bookmark-plus
+ 19 braces
+ 20 brackets
+ 21 brand-git
+ 22 calendar
+ 23 chart-bar
+ 24 chevron-down
+ 25 chevron-left
+ 26 chevron-right
+ 27 chevron-up
+ 28 chevrons-down
+ 29 chevrons-up
+ 30 clipboard
+ 31 clipboard-copy
+ 32 clipboard-text
+ 33 clipboard-x
+ 34 clock
+ 35 code
+ 36 columns-3
+ 37 command
+ 38 copy
+ 39 cursor-text
+ 40 device-floppy
+ 41 external-link
+ 42 eye
+ 43 file-code
+ 44 file-diff
+ 45 file-pencil
+ 46 file-plus
+ 47 file-settings
+ 48 file-text
+ 49 fold-down
+ 50 fold-up
+ 51 folder-open
+ 52 folder-search
+ 53 folder-star
+ 54 forms
+ 55 hexagon-letter-h
+ 56 highlight
+ 57 history
+ 58 indent-decrease
+ 59 indent-increase
+ 60 info-circle
+ 61 keyboard
+ 62 language
+ 63 layout-bottombar
+ 64 layout-bottombar-inactive
+ 65 layout-grid
+ 66 layout-navbar
+ 67 layout-navbar-inactive
+ 68 layout-sidebar-right
+ 69 letter-case
+ 70 letter-case-lower
+ 71 letter-case-toggle
+ 72 letter-case-upper
+ 73 link
+ 74 list-numbers
+ 75 list-search
+ 76 list-tree
+ 77 lock
+ 78 logout
+ 79 maximize
+ 80 message-minus
+ 81 message-plus
+ 82 player-pause
+ 83 player-play
+ 84 player-record
+ 85 puzzle
+ 86 quote
+ 87 quote-off
+ 88 refresh
+ 89 reload
+ 90 repeat
+ 91 replace
+ 92 row-insert-bottom
+ 93 row-remove
+ 94 ruler
+ 95 scissors
+ 96 search
+ 97 select-all
+ 98 server-2
+ 99 settings
+100 sort-ascending
+101 sort-descending
+102 space-off
+103 square-x
+104 star
+105 sum
+106 terminal-2
+107 text-wrap
+108 tools
+109 trash
+110 window-maximize
+111 window-off
+112 world
+113 world-www
+114 x
+115 zoom-in
+116 zoom-reset

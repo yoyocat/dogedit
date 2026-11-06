@@ -1,0 +1,38 @@
+#title=C
+
+#t=Main
+#g=main
+int main(int argc, char **argv) {
+	${1:return 0;}
+}
+
+#t=For loop
+#g=for
+for (int ${1:i} = 0; ${1:i} < ${2:n}; ${1:i}++) {
+	${0:body}
+}
+
+#t=If
+#g=if
+if (${1:condition}) {
+	${0:body}
+}
+
+#t=Struct
+#g=struct
+struct ${1:name} {
+	${2:int field;};
+};
+
+#t=Printf
+#g=printf
+printf("${1:%s}\n", ${2:value});
+
+#t=Include guard
+#g=guard
+#ifndef ${1:NAME}_H
+#define ${1:NAME}_H
+
+${0:body}
+
+#endif

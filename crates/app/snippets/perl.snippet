@@ -1,0 +1,25 @@
+#title=Perl
+
+#t=Subroutine
+#g=sub
+sub ${1:name} {
+	my (${2:@args}) = @_;
+	${0}
+}
+
+#t=Strict header
+#g=strict
+use strict;
+use warnings;
+
+${0}
+
+#t=Foreach
+#g=foreach
+foreach my ${1:$item} (${2:@items}) {
+	${0}
+}
+
+#t=Open file
+#g=open
+open(my $fh, '<', ${1:$path}) or die "$!";

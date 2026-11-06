@@ -1,0 +1,106 @@
+[package]
+name = "dg-app"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "dogedit"
+path = "src/main.rs"
+
+[dependencies]
+dg-core = { path = "../core" }
+dg-large = { path = "../large" }
+dg-hex = { path = "../hex" }
+dg-layout = { path = "../layout" }
+dg-syntax = { path = "../syntax" }
+dg-lsp = { path = "../lsp" }
+dg-render = { path = "../render" }
+dg-skin = { path = "../skin" }
+dg-ui = { path = "../ui" }
+dg-script = { path = "../script" }
+tree-sitter.workspace = true
+crossbeam-channel.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+encoding_rs.workspace = true
+regex.workspace = true
+# 解析器下载：HTTPS 拉 registry.json 与包 zip（download.rs，阻塞式跑在
+# 后台线程）。
+ureq.workspace = true
+
+[dev-dependencies]
+# 测试/基准用的真 grammar —— 发行版二进制不带任何 grammar，
+# 运行时全部来自 parsers\ 插件包（parser_plugin_plan.md §4）。
+tree-sitter-html = "0.23"
+tree-sitter-json = "0.24"
+# download.rs 的测试现造包 zip fixture。
+zip = { workspace = true }
+
+[target.'cfg(target_os = "windows")'.dependencies.windows-core]
+version = "0.62"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+# `Vector2` — the baseline origin type `ID2D1DeviceContext::DrawGlyphRun`
+# takes; the windows crate names it in its generated signatures but does not
+# re-export it.
+windows-numerics = "0.3"
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Input_Ime",
+    "Win32_Graphics_Gdi",
+    "Win32_Graphics_Dwm",
+    "Win32_Graphics_Imaging",
+    # The P0 renderer foundation: D3D11 device + flip-model exchange chain
+    # composed by DWM through DirectComposition, drawn with Direct2D.
+    "Win32_Graphics_Direct2D",
+    "Win32_Graphics_Direct2D_Common",
+    "Win32_Graphics_Direct3D",
+    "Win32_Graphics_Direct3D11",
+    "Win32_Graphics_DirectComposition",
+    "Win32_Graphics_Dxgi",
+    "Win32_Graphics_Dxgi_Common",
+    "Win32_UI_Controls",
+    "Win32_UI_Controls_Dialogs",
+    "Win32_UI_HiDpi",
+    "Win32_Graphics_DirectWrite",
+    # 打印作业的假脱机入口（StartDocW/StartPage/EndPage/EndDoc/AbortDoc）。
+    "Win32_Storage_Xps",
+    # 打印机开口（OpenPrinterW/DocumentPropertiesW）与 DEVMODE。
+    "Win32_Graphics_Printing",
+    # `GetProfileStringW`，默认打印机名在 `windows` 配置节里。
+    "Win32_System_WindowsProgramming",
+    "Win32_System_Threading",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_LibraryLoader",
+    "Win32_System_DataExchange",
+    "Win32_System_Memory",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Ole",
+    "Win32_System_Registry",
+    "Win32_System_SystemServices",
+    "Win32_System_SystemInformation",
+    # `PlaySoundW`, the completion sound the tool runner plays.
+    "Win32_Media_Audio",
+    "Win32_Globalization",
+    "Win32_UI_Shell",
+    "Win32_UI_Shell_Common",
+    # `SHGetFileInfoW`, which is where a tab's small icon comes from.
+    "Win32_Storage_FileSystem",
+    "Win32_System_ProcessStatus",
+    # `FileTimeToLocalFileTime`, used to print backup timestamps.
+    "Win32_System_Time",
+] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", features = ["NSView", "NSWindow"] }
+core-text = "22"
+core-graphics = "0.25"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk4 = "0.11"
+
+

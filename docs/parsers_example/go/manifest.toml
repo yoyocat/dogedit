@@ -1,0 +1,5 @@
+name = "go"
+display = "Go"
+version = "0.1.0"
+extensions = ["go"]
+abi = [13, 15]

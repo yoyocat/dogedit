@@ -1,0 +1,16 @@
+api = 1
+id = "snake"
+name = "贪吃蛇"
+version = "1.0.0"
+description = "用脚本窗格、定时器、具名键和持久存储做的贪吃蛇；演示 Lua 也能写交互小程序"
+order = 95
+
+# 和 luapaint 一样是仓库里的示例包，make_dist.py 不会把它打进发行包。
+# 想临时停用它：setting.ini 的 [Scripts] Disabled=snake。
+
+# 按需启动：开机一条脚本都不跑，扩展菜单只放这一行；点它才装载并长出窗格。
+# 关掉那块窗格（或再点一次菜单，那行会变成「关闭 贪吃蛇」）就整包退出：
+# 命令、按键、定时器、画法、窗格全摘掉，并跑一次 Lua GC 把内存还回去。
+# 包里 App.command 注册的是内部命令，不会一人占扩展菜单八行。
+launch = "贪吃蛇(&S)"
+scripts = ["snake.lua"]

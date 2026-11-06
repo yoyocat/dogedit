@@ -1,0 +1,26 @@
+#title=Batch
+
+#t=Script header
+#g=header
+@echo off
+setlocal
+
+${0}
+
+endlocal
+
+#t=For loop
+#g=for
+for %%${1:i} in (${2:items}) do (
+	${0:echo %%${1:i}}
+)
+
+#t=If
+#g=if
+if ${1:condition} (
+	${0}
+)
+
+#t=Variable
+#g=set
+set "${1:name}=${2:value}"

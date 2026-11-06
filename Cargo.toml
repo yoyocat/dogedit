@@ -1,0 +1,43 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.package]
+edition = "2024"
+version = "0.1.0"
+license = "MIT"
+
+[workspace.dependencies]
+parking_lot = "0.13"
+bitflags = "2"
+encoding_rs = "0.8"
+chardetng = "1"
+tree-sitter = "0.27"
+# 语法不再随二进制分发：grammar 一律来自 parsers\ 插件包
+# （parser_plugin_plan.md）。这里只留运行时核心与 DLL 导出签名。
+tree-sitter-language = "0.1"
+# 解析器插件包（parser_plugin_plan.md）：DLL 动态加载 + manifest 解析。
+libloading = "0.8"
+toml = "1"
+lsp-server = "0.10"
+lsp-types = "0.97"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+crossbeam-channel = "0.5"
+regex = "1"
+# 解析器下载（「解析器下载」功能）：HTTPS 拉注册表与包 zip、zip 校验解包、
+# sha256 对注册表声明的哈希。阻塞式 HTTP 走后台线程，不进 tokio。
+ureq = { version = "2", default-features = false, features = ["tls"] }
+zip = { version = "2", default-features = false, features = ["deflate"] }
+sha2 = "0.10"
+# dg-script 的脚本引擎:Lua 5.4,vendored 从源码编(和 tree-sitter
+# 一样走 cc,三平台都只需要一个 C 编译器)。
+mlua = { version = "0.12", features = ["lua54", "vendored"] }
+
+# 发行构建的体积/性能档：fat LTO + 单 codegen 单元让跨 crate 内联到位，strip
+# 去掉符号表。panic 保持默认 unwind —— 脚本引擎要把 Rust 侧的 panic 转成
+# 脚本能接住的错误，这一路依赖栈回退，不能改成 abort。
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = true

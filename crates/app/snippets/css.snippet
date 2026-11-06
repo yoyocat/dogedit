@@ -1,0 +1,25 @@
+#title=CSS
+
+#t=Rule
+#g=rule
+.${1:selector} {
+	${0:color: inherit;}
+}
+
+#t=Flex row
+#g=flex
+display: flex;
+align-items: ${1:center};
+justify-content: ${2:space-between};
+
+#t=Media query
+#g=media
+@media (${1:min-width}: ${2:600px}) {
+	${0}
+}
+
+#t=Custom property
+#g=var
+:root {
+	--${1:name}: ${2:value};
+}
