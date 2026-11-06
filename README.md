@@ -7,8 +7,8 @@
 **27 themes · incremental tree-sitter highlighting · built-in LSP · Lua 5.4 scripting · 0 web runtimes**
 
 <p>
-  <img src="site/assets/dark.png" alt="DogEdit editing Rust source in a dark theme">
-  <img src="site/assets/light.png" alt="The same file in a light theme">
+  <img src="site/assets/dark.png" width=48% alt="DogEdit editing Rust source in a dark theme">
+  <img src="site/assets/light.png" width=48% alt="The same file in a light theme">
 </p>
 
 ## Why it feels different

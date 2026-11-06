@@ -7,8 +7,8 @@
 **27 套主题 · tree-sitter 增量高亮 · 内置 LSP · Lua 5.4 脚本 · 0 个 Web 运行时**
 
 <p>
-  <img src="site/assets/dark.png"  alt="深色主题下编辑 Rust 源码的 DogEdit">
-  <img src="site/assets/light.png"  alt="同一份文件换成浅色主题">
+  <img src="site/assets/dark.png" width=48% alt="深色主题下编辑 Rust 源码的 DogEdit">
+  <img src="site/assets/light.png" width=48%  alt="同一份文件换成浅色主题">
 </p>
 
 ## 它凭什么不一样
