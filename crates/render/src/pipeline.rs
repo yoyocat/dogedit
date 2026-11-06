@@ -1909,6 +1909,68 @@ mod tests {
         assert_eq!(runs(ViewFlags::shipped_defaults()), off);
     }
 
+    /// 命中那一族（`Found`、自定义标记）画的是 span 自己的底色带子，字换成 span
+    /// 自己的前景色。带子要是和正文同色就等于没画 —— 随包主题那一份份都得给出
+    /// 分得开的底色，`themes.rs` 里按每一份钉一遍，这里钉的是绘制端确实把这两色
+    /// 都发了出去。
+    #[test]
+    fn a_mark_span_lays_its_band_and_writes_its_own_colour() {
+        let theme = Theme::default();
+        let band = Color::rgb(0x59, 0x49, 0x31);
+        let ink = Color::rgb(0xF0, 0xAF, 0x4C);
+        assert_ne!(band, theme.background, "带子本身得和正文底色不同，不然测不出什么");
+        let text = "ab cd";
+        let doc = Document::from_utf8(text.as_bytes());
+        let wrap = wrap_for(text);
+        let sel = SelectionSet::default();
+        let marks = [(3usize, 5usize, band, ink)];
+        let clip = Rect::new(0.0, 0.0, 1e6, 1e6);
+        let mut draw = DrawList::default();
+        PaintPipeline::draw_line(
+            &doc,
+            0,
+            0,
+            &wrap,
+            Some(&[(theme.foreground.to_u32(), 5, 0)]),
+            None,
+            &marks,
+            &[],
+            &[],
+            &[],
+            &sel,
+            &theme,
+            4,
+            ViewFlags::shipped_defaults(),
+            InvisibleChars::default(),
+            clip,
+            clip.w,
+            0.0,
+            0,
+            usize::MAX,
+            &[],
+            false,
+            None,
+            &Default::default(),
+            &mut draw,
+        );
+        let filled: Vec<Color> = draw
+            .cmds
+            .iter()
+            .filter_map(|c| match c {
+                DrawCmd::FillRect { color, .. } => Some(*color),
+                _ => None,
+            })
+            .collect();
+        assert!(filled.contains(&band), "标记的底色没铺：{filled:?}");
+        assert!(
+            coloured_runs(&draw)
+                .iter()
+                .any(|(t, c)| t == "cd" && *c == ink),
+            "标记里的字没换成标记的前景: {:?}",
+            coloured_runs(&draw)
+        );
+    }
+
     /// 「选区文本的背景色扩展到窗口右侧」：整行被同一段选区盖住时，行尾的空白
     /// 也铺上选区底色，一直顶到文本区右缘。选区的最后一行不铺 —— 那行只覆盖到
     /// 选区的结束列。

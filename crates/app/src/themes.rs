@@ -168,6 +168,23 @@ mod tests {
         assert_eq!(replaced, 27, "每一份随包主题的灰指示色都该走保底");
     }
 
+    /// `Found` 的底色是「命中」那一层铺在字后面的带子：选中一个词时它各处出现的
+    /// 地方、查找命中的那一闪、查找结果里被选中的那段，铺的都是它。它一度在随包
+    /// 27 份主题里全都等于正文底色，于是这些高亮只剩下字色，看上去就是「选了文字
+    /// 没有背景色」。底色和正文底色必须分得开，这一条按每一份钉一遍。
+    #[test]
+    fn every_bundled_theme_lays_a_found_band_over_its_page() {
+        use dg_render::theme::{parse_theme_ini, Theme};
+        for (name, ini) in BUNDLED_THEMES {
+            let mut theme = Theme::default();
+            theme.apply_theme_file(&parse_theme_ini(ini));
+            assert_ne!(
+                theme.found_bg, theme.background,
+                "{name}: Found 的底色和正文底色一模一样，那层带子是隐形的"
+            );
+        }
+    }
+
     /// 安全模式只认内置：用户自建的主题名（只有 `themes/Mine.ini`）在这里不
     /// 存在，退回默认那套 —— 叠在一张白纸上就是黑底黑字，正是不安全的那一头。
     #[test]
