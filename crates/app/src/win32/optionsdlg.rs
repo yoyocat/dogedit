@@ -2900,11 +2900,12 @@ unsafe fn set_font_deep(hwnd: HWND, font: HFONT) {    if font.is_invalid() {
     }
 }
 
-/// Themed EDIT/LISTBOX controls paint their own light field and ignore the
-/// WM_CTLCOLOR brush; un-name those two classes so the dark brush wins.
-/// An ownerdraw list paints its own rows, so it does not need the classic
-/// palette `plain_field` forces on stock controls — and keeping its dark
-/// theme is what gives it a dark scrollbar.
+/// A themed `Edit` paints its own light field and ignores the `WM_CTLCOLOR`
+/// brush, so it is un-named and handed back to the dark brush. A stock
+/// `ListBox` needs the same row colours but must keep its theme name —
+/// `DarkMode_Explorer` is what gives it a dark scrollbar — so its client rows
+/// are taken over by `chrome::paint_stock_listbox` instead. An ownerdraw list
+/// already paints its own rows and keeps its theme untouched.
 unsafe fn listbox_is_ownerdraw(hwnd: HWND) -> bool {
     (GetWindowLongPtrW(hwnd, GWL_STYLE) as u32) & (0x0010 | 0x0020) != 0
 }
@@ -2917,9 +2918,11 @@ unsafe fn plain_field(hwnd: HWND) {
         let mut cls = [0u16; 32];
         let n = GetClassNameW(child, &mut cls);
         let name = String::from_utf16_lossy(&cls[..n.max(0) as usize]);
-        if name == "Edit" || (name == "ListBox" && !listbox_is_ownerdraw(child)) {
+        if name == "Edit" {
             let _ = SetWindowTheme(child, w!(" "), w!(" "));
             let _ = InvalidateRect(Some(child), None, true);
+        } else if name == "ListBox" && !listbox_is_ownerdraw(child) {
+            chrome::paint_stock_listbox(child);
         }
         plain_field(child);
         let Ok(next) = GetWindow(child, GW_HWNDNEXT) else {

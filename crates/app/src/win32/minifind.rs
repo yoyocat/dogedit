@@ -55,6 +55,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::{PCWSTR, w};
 
+use crate::win32::chrome;
 use crate::win32::customdraw;
 use crate::win32::ownerdraw;
 use crate::win32::view::instance;
@@ -476,6 +477,9 @@ unsafe fn create(req: Request<'_>, pos: (i32, i32), w: i32, h: i32, dpi: f32) {
         }
     };
     BAR.store(bar.0 as isize, Ordering::Release);
+    // The find bar owns every control it shows and never asks for the dark
+    // children pass, so `WM_CTLCOLORDLG` has to be hooked on it explicitly.
+    chrome::hook_dialog_colours(bar);
 
     let rows: [(i32, Buttons, &str); 3] = [
         (ID_QUERY, FIND_BUTTONS, &req.query),

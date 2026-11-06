@@ -42,7 +42,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetDlgItemTextW, GWLP_USERDATA, GetWindowLongPtrW, IDCANCEL, LB_ADDSTRING,
     LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, MB_OK, MessageBoxW, SendMessageW,
     SetWindowLongPtrW, WM_CLOSE, WM_COMMAND, WM_CTLCOLOREDIT, WM_CTLCOLORBTN,
-    WM_CTLCOLORSTATIC, WM_DESTROY, WM_ERASEBKGND, WM_INITDIALOG, WM_SETTEXT,
+    WM_CTLCOLORLISTBOX, WM_CTLCOLORSTATIC, WM_DESTROY, WM_ERASEBKGND, WM_INITDIALOG, WM_SETTEXT,
 };
 
 use crate::win32::chrome;
@@ -423,6 +423,11 @@ unsafe extern "system" fn dialog_proc(
             let dark = chrome::theme_is_dark(&ctx.theme);
             chrome::set_chrome_theme(&ctx.theme);
             chrome::dark_theme_children(hwnd, dark);
+            if dark {
+                // The list keeps its dark themed scrollbar; the subclass paints
+                // the rows with this dialog's field face and ink instead.
+                chrome::themed_listbox(hwnd, ID_LIST);
+            }
             chrome::title_bar(hwnd, dark);
             let _ = CheckRadioButton(hwnd, ID_SCOPE_CUR, ID_SCOPE_ALL, ID_SCOPE_CUR);
             refill_list(hwnd, None);
@@ -443,7 +448,7 @@ unsafe extern "system" fn dialog_proc(
             let st = ctx(hwnd);
             customdraw::ctlcolor(HDC(wparam.0 as *mut _), st.ink, st.face, st.bg)
         }
-        WM_CTLCOLOREDIT => {
+        WM_CTLCOLOREDIT | WM_CTLCOLORLISTBOX => {
             let st = ctx(hwnd);
             customdraw::ctlcolor(HDC(wparam.0 as *mut _), st.ink, st.field_face, st.field)
         }

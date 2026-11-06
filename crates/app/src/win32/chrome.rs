@@ -18,26 +18,30 @@ use windows::core::{w, BOOL, PCSTR, PCWSTR};
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, RECT, SIZE, WPARAM};
 use windows::Win32::Graphics::Dwm::{DWMWA_USE_IMMERSIVE_DARK_MODE, DwmSetWindowAttribute};
 use windows::Win32::Graphics::Gdi::{
-    BeginPaint, CreatePen, CreateSolidBrush, DeleteObject, DrawFocusRect, EndPaint, FillRect,
-    GetStockObject, GetTextExtentPoint32W, RoundRect, SelectObject, SetBkColor, SetBkMode,
-    SetTextColor, TextOutW, HBRUSH, HGDIOBJ, HFONT, HDC, NULL_BRUSH, PAINTSTRUCT, PS_SOLID,
-    TRANSPARENT,
+    BeginPaint, CreatePen, CreateSolidBrush, DeleteObject, DrawFocusRect, DrawTextW, EndPaint,
+    FillRect, GetDC, GetStockObject, GetTextColor, GetTextExtentPoint32W, InvalidateRect,
+    ReleaseDC, RoundRect, SelectObject, SetBkColor, SetBkMode, SetTextColor, TextOutW, HBRUSH,
+    HGDIOBJ, HFONT, HDC, DT_NOPREFIX, DT_SINGLELINE, DT_VCENTER, NULL_BRUSH, PAINTSTRUCT,
+    PS_SOLID, TRANSPARENT,
 };
 use windows::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryA};
 use windows::Win32::System::Threading::GetCurrentThreadId;
 use windows::Win32::UI::Controls::{
-    BST_CHECKED, CloseThemeData, DrawThemeBackground, GetThemePartSize, OpenThemeData,
-    SetWindowTheme, BP_RADIOBUTTON, TS_DRAW, RBS_CHECKEDDISABLED, RBS_CHECKEDNORMAL,
-    RBS_UNCHECKEDDISABLED, RBS_UNCHECKEDNORMAL,
+    BST_HOT, CloseThemeData, DrawThemeBackground, GetThemePartSize, OpenThemeData, SetWindowTheme,
+    BP_CHECKBOX, BP_RADIOBUTTON, TS_DRAW,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetFocus, IsWindowEnabled};
 use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::{
-    BM_GETCHECK, BS_AUTORADIOBUTTON, BS_GROUPBOX, BS_RADIOBUTTON, CallNextHookEx, EnumChildWindows,
-    GetClassNameW, GetClientRect, GetWindow, GetWindowLongPtrW, GetWindowTextW, MessageBoxW,
-    SendMessageW, SetWindowLongPtrW, SetWindowsHookExW, UnhookWindowsHookEx, GWL_STYLE, GW_OWNER,
-    HCBT_ACTIVATE, HHOOK, MESSAGEBOX_STYLE, WH_CBT, WM_CTLCOLORBTN, WM_CTLCOLOREDIT,
-    WM_CTLCOLORSTATIC, WM_ERASEBKGND, WM_GETFONT, WM_NCDESTROY, WM_PAINT, WS_CLIPCHILDREN,
+    BM_GETSTATE, BS_3STATE, BS_AUTO3STATE, BS_AUTOCHECKBOX, BS_AUTORADIOBUTTON, BS_CHECKBOX,
+    BS_GROUPBOX, BS_LEFTTEXT, BS_PUSHLIKE, BS_RADIOBUTTON, BST_PUSHED, CallNextHookEx,
+    EnumChildWindows, GetClassNameW, GetClientRect, GetDlgItem, GetParent, GetWindow,
+    GetWindowLongPtrW, GetWindowTextW, LB_ERR, LB_GETCOUNT, LB_GETCURSEL, LB_GETITEMRECT,
+    LB_GETSEL, LB_GETTEXT, LB_GETTEXTLEN, LB_GETTOPINDEX, MessageBoxW, SendMessageW,
+    SetWindowLongPtrW, SetWindowsHookExW, UnhookWindowsHookEx, GWL_STYLE, GW_OWNER, HCBT_ACTIVATE,
+    HHOOK, MESSAGEBOX_STYLE, WH_CBT, WM_CTLCOLORBTN, WM_CTLCOLORDLG, WM_CTLCOLOREDIT,
+    WM_CTLCOLORLISTBOX, WM_CTLCOLORSTATIC, WM_ERASEBKGND, WM_GETFONT, WM_NCDESTROY, WM_PAINT,
+    WM_PRINTCLIENT, WS_CLIPCHILDREN,
 };
 
 use crate::win32::prompt;
@@ -117,20 +121,278 @@ pub(super) fn theme_is_dark(theme: &Theme) -> bool {
     (u32::from(c.r) * 299 + u32::from(c.g) * 587 + u32::from(c.b) * 114) / 1000 < 128
 }
 
-/// The chrome palette a group box is painted with: the dialog face behind the
-/// caption, the caption
-/// process-wide table (a process-wide table, filled when the theme is applied)
-/// and reads it from the group-box subclass, so this does too — which is why
-/// `set_chrome_theme` runs wherever a dialog asks for the dark style.
+/// The chrome table, filled when the theme is applied. A `Button` subclass asks
+/// its own parent for the face and the enabled ink (see [`fill_parent_face`]), so
+/// `FACE`/`CAPTION` here are only the fallback for a parent that never answers.
+/// `LINE` is the group box's frame, `DIM` the disabled caption — neither has a
+/// per-dialog equivalent, which is why `set_chrome_theme` still runs wherever a
+/// dialog asks for the dark style.
 static CHROME_FACE: AtomicU32 = AtomicU32::new(0x0020_2020);
 static CHROME_CAPTION: AtomicU32 = AtomicU32::new(0x00E0_E0E0);
 static CHROME_LINE: AtomicU32 = AtomicU32::new(0x0046_4646);
+static CHROME_DIM: AtomicU32 = AtomicU32::new(0x008C_8C8C);
+/// A stock list box's selected row. The visual style would supply a system
+/// highlight that has nothing to do with the loaded theme, so the row painter
+/// takes this instead.
+static CHROME_SELECT: AtomicU32 = AtomicU32::new(0x0078_4F26);
 
-/// Publishes the theme's chrome colours for [`groupbox_proc`].
+/// Publishes the theme's chrome colours for the button and list-box painters.
 pub(super) fn set_chrome_theme(theme: &Theme) {
     CHROME_FACE.store(to_colorref(theme.toolbar_bg).0, Ordering::Release);
     CHROME_CAPTION.store(to_colorref(theme.toolbar_fg).0, Ordering::Release);
     CHROME_LINE.store(to_colorref(theme.toolbar_border).0, Ordering::Release);
+    CHROME_DIM.store(to_colorref(theme.toolbar_disabled).0, Ordering::Release);
+    CHROME_SELECT.store(to_colorref(theme.selection_bg).0, Ordering::Release);
+}
+
+/// Asks a control's parent for the brush and the ink it publishes on one of the
+/// `WM_CTLCOLOR*` questions, without drawing anything. The brush belongs to the
+/// parent and outlives the paint.
+///
+/// `DefWindowProc` answers with the system ink — black on a light system — and
+/// a stock brush. A dark dialog never paints a caption in black, so seeding the
+/// DC with 0 lets the same value mean "the parent did not publish its own
+/// palette" afterwards. (Not CLR_INVALID: `SetTextColor` would reject
+/// 0xFFFFFFFF and leave the DC untouched.) The chrome table is the fallback.
+unsafe fn parent_colours(hwnd: HWND, hdc: HDC, msg: u32) -> (Option<HBRUSH>, COLORREF) {
+    SetTextColor(hdc, COLORREF(0));
+    let mut brush = None;
+    if let Ok(parent) = GetParent(hwnd) {
+        if !parent.0.is_null() {
+            let answer = SendMessageW(
+                parent,
+                msg,
+                Some(WPARAM(hdc.0 as usize)),
+                Some(LPARAM(hwnd.0 as isize)),
+            );
+            if answer.0 != 0 {
+                brush = Some(HBRUSH(answer.0 as *mut core::ffi::c_void));
+            }
+        }
+    }
+    let answered = GetTextColor(hdc).0;
+    // Zero ink means the default dialog procedure answered, and the brush it
+    // handed back is its light stock one — neither belongs on a dark dialog.
+    if answered == 0 {
+        return (None, COLORREF(CHROME_CAPTION.load(Ordering::Acquire)));
+    }
+    (brush, COLORREF(answered))
+}
+
+/// The face brush and the caption ink a `Button` subclass paints with.
+///
+/// A themed button stopped asking its parent, but the parent's `WM_CTLCOLORBTN`
+/// answer is still the one place that knows this dialog's own face — some pages
+/// fill from `Theme::background`, others from `toolbar_bg`, and a process-wide
+/// chrome table cannot be right for both. Asking it explicitly is what keeps the
+/// rectangle behind a check or a group box the same colour as the dialog.
+///
+/// Returns the ink the parent chose; a disabled caption still takes [`CHROME_DIM`].
+#[allow(unsafe_op_in_unsafe_fn)]
+unsafe fn fill_parent_face(hwnd: HWND, hdc: HDC, rc: &RECT) -> COLORREF {
+    let (brush, ink) = parent_colours(hwnd, hdc, WM_CTLCOLORBTN);
+    if let Some(brush) = brush {
+        let _ = FillRect(hdc, rc, brush);
+    } else {
+        let own = CreateSolidBrush(COLORREF(CHROME_FACE.load(Ordering::Acquire)));
+        let _ = FillRect(hdc, rc, own);
+        let _ = DeleteObject(HGDIOBJ(own.0));
+    }
+    ink
+}
+
+/// A stock `ListBox` named `DarkMode_Explorer` gets the style's dark scrollbar,
+/// but its rows are painted with the style's own palette — on a light system
+/// palette that is black ink on a light field, and the parent's
+/// `WM_CTLCOLORLISTBOX` answer is ignored. Un-naming the control used to be the
+/// workaround and cost the scrollbar. Instead the subclass below paints only
+/// the client rows: the non-client frame, and with it the dark scrollbar, stays
+/// with the visual style.
+pub(super) fn themed_listbox(dlg: HWND, id: i32) {
+    unsafe {
+        if let Ok(ctl) = GetDlgItem(Some(dlg), id) {
+            paint_stock_listbox(ctl);
+        }
+    }
+}
+
+/// The subclass id for a stock list box's rows.
+const LISTBOX_SUBCLASS: usize = 8;
+
+/// `LBS_OWNERDRAWFIXED | LBS_OWNERDRAWVARIABLE`. An ownerdraw list already
+/// paints its own rows from the theme, and its scrollbar is already dark.
+fn is_stock_listbox(style: u32) -> bool {
+    style & 0x0030 == 0
+}
+
+/// Takes over a stock list's client paint without touching its theme name.
+pub(super) fn paint_stock_listbox(hwnd: HWND) {
+    unsafe {
+        let mut class = [0u16; 32];
+        let len = GetClassNameW(hwnd, &mut class);
+        if len <= 0 || String::from_utf16_lossy(&class[..len as usize]) != "ListBox" {
+            return;
+        }
+        if !is_stock_listbox(GetWindowLongPtrW(hwnd, GWL_STYLE) as u32) {
+            return;
+        }
+        let _ = SetWindowSubclass(hwnd, Some(listbox_proc), LISTBOX_SUBCLASS, 0);
+        let _ = InvalidateRect(Some(hwnd), None, true);
+    }
+}
+
+/// Only the client half of a themed list is ours. `WM_PAINT` still goes through
+/// the default procedure first, so the style keeps drawing its frame and dark
+/// scrollbar; the rows are then repainted over whatever ink it chose.
+#[allow(unsafe_op_in_unsafe_fn)]
+unsafe extern "system" fn listbox_proc(
+    hwnd: HWND,
+    msg: u32,
+    wp: WPARAM,
+    lp: LPARAM,
+    _id: usize,
+    _refdata: usize,
+) -> LRESULT {
+    match msg {
+        WM_ERASEBKGND => {
+            let hdc = HDC(wp.0 as *mut core::ffi::c_void);
+            let mut rc = RECT::default();
+            let _ = GetClientRect(hwnd, &mut rc);
+            let (brush, _) = parent_colours(hwnd, hdc, WM_CTLCOLORLISTBOX);
+            if let Some(brush) = brush {
+                let _ = FillRect(hdc, &rc, brush);
+            } else {
+                let own = CreateSolidBrush(COLORREF(CHROME_FACE.load(Ordering::Acquire)));
+                let _ = FillRect(hdc, &rc, own);
+                let _ = DeleteObject(HGDIOBJ(own.0));
+            }
+            LRESULT(1)
+        }
+        WM_PAINT => {
+            let base = DefSubclassProc(hwnd, msg, wp, lp);
+            let hdc = GetDC(Some(hwnd));
+            if !hdc.0.is_null() {
+                paint_list_rows(hwnd, hdc);
+                let _ = ReleaseDC(Some(hwnd), hdc);
+            }
+            base
+        }
+        WM_PRINTCLIENT => {
+            let hdc = HDC(wp.0 as *mut core::ffi::c_void);
+            if !hdc.0.is_null() {
+                paint_list_rows(hwnd, hdc);
+            }
+            LRESULT(1)
+        }
+        WM_NCDESTROY => {
+            let _ = RemoveWindowSubclass(hwnd, Some(listbox_proc), LISTBOX_SUBCLASS);
+            DefSubclassProc(hwnd, msg, wp, lp)
+        }
+        _ => DefSubclassProc(hwnd, msg, wp, lp),
+    }
+}
+
+/// Every visible row, drawn with the parent's field brush and ink and the
+/// theme's selection colour. The window's own visual style is left in place for
+/// the non-client scrollbar, and nothing here depends on what palette it picked
+/// for its rows.
+#[allow(unsafe_op_in_unsafe_fn)]
+unsafe fn paint_list_rows(hwnd: HWND, hdc: HDC) {
+    let mut rc = RECT::default();
+    let _ = GetClientRect(hwnd, &mut rc);
+    let (brush, ink) = parent_colours(hwnd, hdc, WM_CTLCOLORLISTBOX);
+    let mut owned = None;
+    let field = match brush {
+        Some(b) => b,
+        None => {
+            let b = CreateSolidBrush(COLORREF(CHROME_FACE.load(Ordering::Acquire)));
+            owned = Some(b);
+            b
+        }
+    };
+    let selected = CreateSolidBrush(COLORREF(CHROME_SELECT.load(Ordering::Acquire)));
+    let font = HFONT(SendMessageW(hwnd, WM_GETFONT, None, None).0 as *mut core::ffi::c_void);
+    let has_font = !font.0.is_null();
+    let old = if has_font {
+        SelectObject(hdc, HGDIOBJ(font.0))
+    } else {
+        HGDIOBJ::default()
+    };
+    let _ = SetBkMode(hdc, TRANSPARENT);
+    let _ = FillRect(hdc, &rc, field);
+
+    let enabled = IsWindowEnabled(hwnd).as_bool();
+    let row_ink = if enabled {
+        ink
+    } else {
+        COLORREF(CHROME_DIM.load(Ordering::Acquire))
+    };
+    let focused = GetFocus() == hwnd;
+    let cur = SendMessageW(hwnd, LB_GETCURSEL, None, None).0;
+    let count = SendMessageW(hwnd, LB_GETCOUNT, None, None).0;
+    let first = SendMessageW(hwnd, LB_GETTOPINDEX, None, None).0.max(0);
+    let multicol = GetWindowLongPtrW(hwnd, GWL_STYLE) as u32 & 0x0200 != 0;
+    let mut i = first;
+    while i < count {
+        let mut row = RECT::default();
+        let got = SendMessageW(
+            hwnd,
+            LB_GETITEMRECT,
+            Some(WPARAM(i as usize)),
+            Some(LPARAM(&mut row as *mut RECT as isize)),
+        );
+        if got.0 as i32 == LB_ERR {
+            break;
+        }
+        if row.top > rc.bottom {
+            // A multi-column list wraps back to the top for the next column.
+            if !multicol {
+                break;
+            }
+            i += 1;
+            continue;
+        }
+        let is_sel = SendMessageW(hwnd, LB_GETSEL, Some(WPARAM(i as usize)), None).0 > 0;
+        let _ = FillRect(hdc, &row, if is_sel { selected } else { field });
+        let len = SendMessageW(hwnd, LB_GETTEXTLEN, Some(WPARAM(i as usize)), None).0;
+        if len > 0 {
+            let mut buf = vec![0u16; len as usize + 1];
+            let copied = SendMessageW(
+                hwnd,
+                LB_GETTEXT,
+                Some(WPARAM(i as usize)),
+                Some(LPARAM(buf.as_mut_ptr() as isize)),
+            )
+            .0;
+            if copied > 0 {
+                let n = (copied as usize).min(buf.len());
+                let mut caption = row;
+                caption.left += 2;
+                caption.right = (caption.right - 2).max(caption.left);
+                SetTextColor(hdc, row_ink);
+                // DrawText clips to the row rect, which is what keeps a long
+                // item out of the next column of a multi-column list.
+                let _ = DrawTextW(
+                    hdc,
+                    &mut buf[..n],
+                    &mut caption,
+                    DT_NOPREFIX | DT_SINGLELINE | DT_VCENTER,
+                );
+            }
+        }
+        if focused && i == cur {
+            let mut frame = row;
+            let _ = DrawFocusRect(hdc, &mut frame);
+        }
+        i += 1;
+    }
+    if has_font {
+        let _ = SelectObject(hdc, old);
+    }
+    let _ = DeleteObject(HGDIOBJ(selected.0));
+    if let Some(b) = owned {
+        let _ = DeleteObject(HGDIOBJ(b.0));
+    }
 }
 
 /// the window-theme helper's class-specific half for a group box: after the window has
@@ -173,8 +435,7 @@ unsafe extern "system" fn groupbox_proc(
             let hdc = BeginPaint(hwnd, &mut ps);
             let mut rc = RECT::default();
             let _ = GetClientRect(hwnd, &mut rc);
-            let face = CreateSolidBrush(COLORREF(CHROME_FACE.load(Ordering::Acquire)));
-            let _ = FillRect(hdc, &rc, face);
+            let ink = fill_parent_face(hwnd, hdc, &rc);
             let mut text = vec![0u16; 256];
             let len = GetWindowTextW(hwnd, &mut text).max(0) as usize;
             let text = &text[..len.min(text.len())];
@@ -194,10 +455,9 @@ unsafe extern "system" fn groupbox_proc(
             let _ = SelectObject(hdc, oldbrush);
             let _ = SelectObject(hdc, oldpen);
             let _ = DeleteObject(HGDIOBJ(pen.0));
-            let _ = DeleteObject(HGDIOBJ(face.0));
             if !text.is_empty() {
                 let _ = SetBkMode(hdc, TRANSPARENT);
-                SetTextColor(hdc, COLORREF(CHROME_CAPTION.load(Ordering::Acquire)));
+                SetTextColor(hdc, ink);
                 let _ = TextOutW(hdc, rc.left + 7, rc.top + 1, text);
             }
             let _ = SelectObject(hdc, old);
@@ -213,13 +473,16 @@ unsafe extern "system" fn groupbox_proc(
 }
 
 
-/// `groupbox_hook`'s other half of the `Button` class: a radio button whose
-/// caption the visual style owns. A radio does ask its parent for the colours —
-/// the page's `WM_CTLCOLORSTATIC` arm runs for it and sets the theme's ink — and
-/// then draws the label with the style's own text colour, which stays black on
-/// the dark face. Check boxes take the parent's ink and need nothing, so this
-/// only takes the two radio styles.
-fn radio_hook(hwnd: HWND) {
+/// `groupbox_hook`'s other half of the `Button` class: the two-choice buttons,
+/// check boxes and radios. A visual-style button paints its caption with the
+/// style's own text colour, not the ink its parent set on `WM_CTLCOLORBTN` —
+/// when the system palette is light that caption is black and disappears on the
+/// dark face, while the glyph beside it is still dark. Taking over the whole
+/// paint fixes the caption on every machine: the face and the ink come from the
+/// parent's `WM_CTLCOLORBTN` answer, the glyph still comes from the button's own
+/// visual style. Push-like toggles, owner-drawn buttons, group boxes and push
+/// buttons keep their own paint.
+fn choice_hook(hwnd: HWND) {
     let mut class = [0u16; 64];
     let len = unsafe { GetClassNameW(hwnd, &mut class) };
     if len <= 0 {
@@ -228,28 +491,90 @@ fn radio_hook(hwnd: HWND) {
     if String::from_utf16_lossy(&class[..len as usize]) != "Button" {
         return;
     }
-    if !is_radio_style(unsafe { GetWindowLongPtrW(hwnd, GWL_STYLE) } as u32) {
+    if choice_style(unsafe { GetWindowLongPtrW(hwnd, GWL_STYLE) } as u32).is_none() {
         return;
     }
     unsafe {
-        let _ = SetWindowSubclass(hwnd, Some(radio_proc), 5, usize::default());
+        let _ = SetWindowSubclass(hwnd, Some(choice_proc), 5, usize::default());
     }
 }
 
-/// The two `Button` type bits whose caption the style owns. A check box honours
-/// the parent's `WM_CTLCOLORSTATIC` ink, so taking it here would only replace a
-/// working paint with a hand-made one.
-fn is_radio_style(style: u32) -> bool {
-    let kind = style & 0xF;
-    kind == BS_RADIOBUTTON as u32 || kind == BS_AUTORADIOBUTTON as u32
+/// Which visual-style part a two-choice button draws, or nothing for a
+/// `Button` that must keep its own paint.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Choice {
+    Check,
+    Radio,
 }
 
-/// The face, the dark glyph and the caption, drawn in the order the style would
-/// have drawn them: the ring comes from the button's own visual style so the
-/// selected dot keeps the palette the sub-app name chose, and only the ink of the
-/// caption is the chrome table's.
+fn choice_style(style: u32) -> Option<Choice> {
+    if style & BS_PUSHLIKE as u32 != 0 {
+        return None;
+    }
+    let kind = style & 0xF;
+    if kind == BS_CHECKBOX as u32
+        || kind == BS_AUTOCHECKBOX as u32
+        || kind == BS_3STATE as u32
+        || kind == BS_AUTO3STATE as u32
+    {
+        Some(Choice::Check)
+    } else if kind == BS_RADIOBUTTON as u32 || kind == BS_AUTORADIOBUTTON as u32 {
+        Some(Choice::Radio)
+    } else {
+        None
+    }
+}
+
+/// A caption's `&` is a mnemonic prefix, not ink. `&&` is the one form that
+/// does stand for a literal ampersand; everything else drops the marker and
+/// keeps the character it marked, which is what `DT_HIDEPREFIX` does.
+fn hide_prefix(text: &[u16]) -> Vec<u16> {
+    let mut out = Vec::with_capacity(text.len());
+    let mut i = 0;
+    while i < text.len() {
+        if text[i] == b'&' as u16 {
+            if i + 1 < text.len() && text[i + 1] == b'&' as u16 {
+                out.push(b'&' as u16);
+                i += 2;
+                continue;
+            }
+        } else {
+            out.push(text[i]);
+        }
+        i += 1;
+    }
+    out
+}
+
+/// The visual-style state for one two-choice button. `BM_GETSTATE`'s low bits
+/// are 未选 / 选中 / 不确定 (radios have no third one), and each of those owns
+/// four consecutive states: 普通、指向、按下、禁用.
+fn choice_state_id(kind: Choice, enabled: bool, button_state: u32) -> i32 {
+    let check = match kind {
+        Choice::Check => (button_state & 0x3).min(2),
+        Choice::Radio => button_state & 0x1,
+    };
+    let phase = if !enabled {
+        3
+    } else if button_state & BST_PUSHED != 0 {
+        2
+    } else if button_state & BST_HOT != 0 {
+        1
+    } else {
+        0
+    };
+    1 + 4 * check as i32 + phase
+}
+
+/// The face, the glyph and the caption, drawn in the order the style would have
+/// drawn them: the square or the ring comes from the button's own visual style,
+/// so the selected tick keeps the palette the sub-app name chose, while the face
+/// and the caption's ink come from the parent's `WM_CTLCOLORBTN` answer — the
+/// same brush the rest of that dialog is filled with. Disabled captions take
+/// `ToolbarDisabled` instead of dimming that ink, which would otherwise land on
+/// the border colour and vanish into the face.
 #[allow(unsafe_op_in_unsafe_fn)]
-unsafe extern "system" fn radio_proc(
+unsafe extern "system" fn choice_proc(
     hwnd: HWND,
     msg: u32,
     wp: WPARAM,
@@ -262,9 +587,7 @@ unsafe extern "system" fn radio_proc(
             let hdc = HDC(wp.0 as *mut core::ffi::c_void);
             let mut rc = RECT::default();
             let _ = GetClientRect(hwnd, &mut rc);
-            let face = CreateSolidBrush(COLORREF(CHROME_FACE.load(Ordering::Acquire)));
-            let _ = FillRect(hdc, &rc, face);
-            let _ = DeleteObject(HGDIOBJ(face.0));
+            let _ = fill_parent_face(hwnd, hdc, &rc);
             LRESULT(1)
         }
         WM_PAINT => {
@@ -272,59 +595,71 @@ unsafe extern "system" fn radio_proc(
             let hdc = BeginPaint(hwnd, &mut ps);
             let mut rc = RECT::default();
             let _ = GetClientRect(hwnd, &mut rc);
-            let face = CreateSolidBrush(COLORREF(CHROME_FACE.load(Ordering::Acquire)));
-            let _ = FillRect(hdc, &rc, face);
-            let enabled = IsWindowEnabled(hwnd).as_bool();
-            let checked = SendMessageW(hwnd, BM_GETCHECK, None, None).0 as u32 == BST_CHECKED.0;
-            let state = match (enabled, checked) {
-                (false, false) => RBS_UNCHECKEDDISABLED,
-                (false, true) => RBS_CHECKEDDISABLED,
-                (true, false) => RBS_UNCHECKEDNORMAL,
-                (true, true) => RBS_CHECKEDNORMAL,
+            let parent_ink = fill_parent_face(hwnd, hdc, &rc);
+            let style = GetWindowLongPtrW(hwnd, GWL_STYLE) as u32;
+            let kind = choice_style(style).unwrap_or(Choice::Radio);
+            let part = if kind == Choice::Check {
+                BP_CHECKBOX.0
+            } else {
+                BP_RADIOBUTTON.0
             };
+            let enabled = IsWindowEnabled(hwnd).as_bool();
+            let button_state = SendMessageW(hwnd, BM_GETSTATE, None, None).0 as u32;
+            let state = choice_state_id(kind, enabled, button_state);
             let theme = OpenThemeData(Some(hwnd), w!("BUTTON"));
             let mut ring = SIZE { cx: 16, cy: 16 };
             if theme.0 != 0 {
-                if let Ok(size) =
-                    GetThemePartSize(theme, Some(hdc), BP_RADIOBUTTON.0, state.0, None, TS_DRAW)
-                {
+                if let Ok(size) = GetThemePartSize(theme, Some(hdc), part, state, None, TS_DRAW) {
                     if size.cx > 0 && size.cy > 0 {
                         ring = size;
                     }
                 }
             }
+            // `BS_LEFTTEXT` puts the square on the right and right-aligns the
+            // caption against it.
+            let left_text = style & BS_LEFTTEXT as u32 != 0;
+            let glyph_left = if left_text {
+                rc.right - ring.cx
+            } else {
+                rc.left
+            };
             let top = (rc.bottom - ring.cy) / 2;
             let glyph = RECT {
-                left: rc.left,
+                left: glyph_left,
                 top,
-                right: rc.left + ring.cx,
+                right: glyph_left + ring.cx,
                 bottom: top + ring.cy,
             };
             if theme.0 != 0 {
-                let _ = DrawThemeBackground(theme, hdc, BP_RADIOBUTTON.0, state.0, &glyph, None);
+                let _ = DrawThemeBackground(theme, hdc, part, state, &glyph, None);
             }
-            let mut text = vec![0u16; 256];
-            let len = GetWindowTextW(hwnd, &mut text).max(0) as usize;
-            let text = &text[..len.min(text.len())];
+            let mut raw = vec![0u16; 256];
+            let len = GetWindowTextW(hwnd, &mut raw).max(0) as usize;
+            let text = hide_prefix(&raw[..len.min(raw.len())]);
             let font = HFONT(SendMessageW(hwnd, WM_GETFONT, None, None).0 as *mut core::ffi::c_void);
             let old = SelectObject(hdc, HGDIOBJ(font.0));
             let mut size = SIZE::default();
             if !text.is_empty() {
-                let _ = GetTextExtentPoint32W(hdc, text, &mut size);
+                let _ = GetTextExtentPoint32W(hdc, &text, &mut size);
                 let _ = SetBkMode(hdc, TRANSPARENT);
                 let ink = if enabled {
-                    CHROME_CAPTION.load(Ordering::Acquire)
+                    parent_ink
                 } else {
-                    CHROME_LINE.load(Ordering::Acquire)
+                    COLORREF(CHROME_DIM.load(Ordering::Acquire))
                 };
-                SetTextColor(hdc, COLORREF(ink));
+                SetTextColor(hdc, ink);
                 let baseline = (rc.bottom - size.cy) / 2;
-                let _ = TextOutW(hdc, glyph.right + 4, baseline, text);
+                let text_left = if left_text {
+                    glyph.left - 4 - size.cx
+                } else {
+                    glyph.right + 4
+                };
+                let _ = TextOutW(hdc, text_left, baseline, &text);
                 if GetFocus() == hwnd {
                     let mut frame = RECT {
-                        left: glyph.right + 2,
+                        left: text_left - 2,
                         top: baseline - 1,
-                        right: glyph.right + 6 + size.cx,
+                        right: text_left + size.cx + 2,
                         bottom: baseline + size.cy + 1,
                     };
                     let _ = DrawFocusRect(hdc, &mut frame);
@@ -334,12 +669,11 @@ unsafe extern "system" fn radio_proc(
             if theme.0 != 0 {
                 let _ = CloseThemeData(theme);
             }
-            let _ = DeleteObject(HGDIOBJ(face.0));
             let _ = EndPaint(hwnd, &ps);
             LRESULT(1)
         }
         WM_NCDESTROY => {
-            let _ = RemoveWindowSubclass(hwnd, Some(radio_proc), 5);
+            let _ = RemoveWindowSubclass(hwnd, Some(choice_proc), 5);
             DefSubclassProc(hwnd, msg, wp, lp)
         }
         _ => DefSubclassProc(hwnd, msg, wp, lp),
@@ -367,7 +701,10 @@ pub(super) fn allow_dark_mode(hwnd: HWND, dark: bool) {
 /// for `ComboBox` and for `Edit` without scrollbars, `DarkMode_Explorer` for
 /// every other window, including `Button`, `Static`, `SysListView32` and the
 /// dialog itself. The class-specific halves that follow only subclass (`Button`
-/// group boxes and radios, framed/icon `Static`, `SysTabControl32`, list views).
+/// group boxes and the two-choice buttons, framed/icon `Static`,
+/// `SysTabControl32`, list views). A stock `ListBox` gets the separate
+/// [`paint_stock_listbox`] subclass, which paints only its client rows and so
+/// never clears the name that supplies the dark scrollbar.
 /// The gating flags are `RtlGetNtVersionNumbers` build ≥ 17763.
 pub(super) fn dark_theme(hwnd: HWND, dark: bool) {
     // 深浅色归进程那一格管，单个窗口只能要求浅色：见 [`APP_DARK`]。
@@ -395,7 +732,7 @@ pub(super) fn dark_theme(hwnd: HWND, dark: bool) {
     }
     if dark {
         groupbox_hook(hwnd);
-        radio_hook(hwnd);
+        choice_hook(hwnd);
     }
 }
 
@@ -438,9 +775,56 @@ fn dark_sub_app(hwnd: HWND) -> &'static str {
 /// dark style. A dialog that only asked for itself keeps light-mode controls.
 pub(super) fn dark_theme_tree(hwnd: HWND, dark: bool) {
     dark_theme(hwnd, dark);
+    if dark {
+        hook_dialog_colours(hwnd);
+    }
     unsafe {
         let _ = EnumChildWindows(Some(hwnd), Some(dark_theme_child), LPARAM(dark as isize));
     }
+}
+
+/// The subclass id for the dialog's own colour question.
+const DLG_COLOUR_SUBCLASS: usize = 7;
+
+/// `WM_CTLCOLORDLG` is the one colour question no dialog in this tree answered:
+/// they all fill their own face in `WM_ERASEBKGND`, but the system still asks for
+/// a brush, and the default `#32770` answer is `COLOR_3DFACE`. Routing the
+/// question to the very same window's `WM_CTLCOLORBTN` gets the *dialog's own*
+/// face brush and ink — every dialog already publishes those two there — without
+/// growing one more arm in twenty window procedures. `SendMessageW`, not
+/// `DefSubclassProc`, so windows that own their paint (the system message box)
+/// answer through their place in the subclass chain too.
+pub(super) fn hook_dialog_colours(hwnd: HWND) {
+    unsafe {
+        let _ = SetWindowSubclass(hwnd, Some(dlg_colour_proc), DLG_COLOUR_SUBCLASS, 0);
+    }
+}
+
+#[allow(unsafe_op_in_unsafe_fn)]
+unsafe extern "system" fn dlg_colour_proc(
+    hwnd: HWND,
+    msg: u32,
+    wp: WPARAM,
+    lp: LPARAM,
+    _id: usize,
+    _refdata: usize,
+) -> LRESULT {
+    if msg == WM_CTLCOLORDLG {
+        let self_hwnd = LPARAM(hwnd.0 as isize);
+        let hdc = HDC(wp.0 as *mut core::ffi::c_void);
+        // A window without a WM_CTLCOLORBTN arm (the find bar) leaves the ink
+        // at the default black; its face is published on WM_CTLCOLORSTATIC.
+        SetTextColor(hdc, COLORREF(0));
+        let btn = SendMessageW(hwnd, WM_CTLCOLORBTN, Some(wp), Some(self_hwnd));
+        if GetTextColor(hdc).0 != 0 {
+            return btn;
+        }
+        return SendMessageW(hwnd, WM_CTLCOLORSTATIC, Some(wp), Some(self_hwnd));
+    }
+    if msg == WM_NCDESTROY {
+        let _ = RemoveWindowSubclass(hwnd, Some(dlg_colour_proc), DLG_COLOUR_SUBCLASS);
+    }
+    DefSubclassProc(hwnd, msg, wp, lp)
 }
 
 /// The same ask for the controls only. A `#32770` that gets `SetWindowTheme` on
@@ -450,6 +834,9 @@ pub(super) fn dark_theme_tree(hwnd: HWND, dark: bool) {
 /// dialog's own face is painted by its window proc, so only the controls need
 /// the palette.
 pub(super) fn dark_theme_children(hwnd: HWND, dark: bool) {
+    if dark {
+        hook_dialog_colours(hwnd);
+    }
     unsafe {
         let _ = EnumChildWindows(Some(hwnd), Some(dark_theme_child), LPARAM(dark as isize));
     }
@@ -671,18 +1058,357 @@ fn box_brush() -> HBRUSH {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use windows::Win32::UI::Controls::{
+        CBS_CHECKEDDISABLED, CBS_CHECKEDNORMAL, CBS_CHECKEDPRESSED, CBS_MIXEDNORMAL,
+        CBS_UNCHECKEDHOT, CBS_UNCHECKEDNORMAL, RBS_CHECKEDNORMAL, RBS_UNCHECKEDDISABLED,
+    };
 
-    /// The styles the option pages actually carry (verified template
-    /// words): only the two radios of 代理 take the hand-drawn caption, while the
-    /// checkbox, push button and group-box styles keep their own paint.
+    /// Every check box and radio the templates carry is taken over; push
+    /// buttons, group boxes, owner-drawn buttons and push-like toggles are not.
     #[test]
-    fn only_the_radio_styles_are_taken_over() {
-        assert!(is_radio_style(0x5002_0009));
-        assert!(is_radio_style(0x5000_0009));
-        assert!(is_radio_style(BS_RADIOBUTTON as u32));
-        assert!(!is_radio_style(0x5001_0003));
-        assert!(!is_radio_style(0x5001_0000));
-        assert!(!is_radio_style(0x5000_0007));
-        assert!(!is_radio_style(0x5001_0001));
+    fn choice_styles_are_taken_over_and_the_rest_are_left_alone() {
+        assert_eq!(choice_style(0x5001_0003), Some(Choice::Check));
+        assert_eq!(choice_style(0x5001_0002), Some(Choice::Check));
+        assert_eq!(choice_style(BS_3STATE as u32), Some(Choice::Check));
+        assert_eq!(choice_style(BS_AUTO3STATE as u32), Some(Choice::Check));
+        assert_eq!(
+            choice_style(BS_LEFTTEXT as u32 | 0x5001_0003),
+            Some(Choice::Check)
+        );
+        assert_eq!(choice_style(0x5002_0009), Some(Choice::Radio));
+        assert_eq!(choice_style(0x5000_0009), Some(Choice::Radio));
+        assert_eq!(choice_style(BS_RADIOBUTTON as u32), Some(Choice::Radio));
+        assert_eq!(choice_style(0x5001_0000), None);
+        assert_eq!(choice_style(0x5001_0001), None);
+        assert_eq!(choice_style(0x5000_0007), None);
+        assert_eq!(choice_style(0x5001_000B), None);
+        assert_eq!(choice_style(0x5001_0003 | BS_PUSHLIKE as u32), None);
+    }
+
+    #[test]
+    fn captions_hide_mnemonic_prefixes() {
+        let wide = |s: &str| s.encode_utf16().collect::<Vec<_>>();
+        assert_eq!(hide_prefix(&wide("包含子文件夹(&I)")), wide("包含子文件夹(I)"));
+        assert_eq!(hide_prefix(&wide("A && B")), wide("A & B"));
+        assert_eq!(hide_prefix(&wide("plain")), wide("plain"));
+    }
+
+    /// A two-choice button's states are four consecutive ids per check state.
+    #[test]
+    fn choice_state_ids_follow_the_visual_style() {
+        assert_eq!(
+            choice_state_id(Choice::Check, true, 0),
+            CBS_UNCHECKEDNORMAL.0
+        );
+        assert_eq!(
+            choice_state_id(Choice::Check, true, BST_HOT),
+            CBS_UNCHECKEDHOT.0
+        );
+        assert_eq!(
+            choice_state_id(Choice::Check, true, 1),
+            CBS_CHECKEDNORMAL.0
+        );
+        assert_eq!(
+            choice_state_id(Choice::Check, true, BST_PUSHED | 1),
+            CBS_CHECKEDPRESSED.0
+        );
+        assert_eq!(
+            choice_state_id(Choice::Check, true, 2),
+            CBS_MIXEDNORMAL.0
+        );
+        assert_eq!(
+            choice_state_id(Choice::Check, false, 1),
+            CBS_CHECKEDDISABLED.0
+        );
+        assert_eq!(
+            choice_state_id(Choice::Radio, true, 1),
+            RBS_CHECKEDNORMAL.0
+        );
+        assert_eq!(
+            choice_state_id(Choice::Radio, false, 0),
+            RBS_UNCHECKEDDISABLED.0
+        );
+    }
+
+    // Values no real theme uses, so a pixel or a DC colour saying either of
+    // them is unambiguous proof of which window supplied the palette.
+    const PARENT_INK: u32 = 0x0012_3456;
+    const PARENT_FACE: u32 = 0x0077_8899;
+
+    thread_local! {
+        static PARENT_BRUSH: Cell<isize> = const { Cell::new(0) };
+    }
+
+    unsafe extern "system" fn ctl_parent_proc(
+        hwnd: HWND,
+        msg: u32,
+        wp: WPARAM,
+        lp: LPARAM,
+    ) -> LRESULT {
+        if msg == WM_CTLCOLORBTN || msg == WM_CTLCOLORLISTBOX {
+            SetTextColor(HDC(wp.0 as *mut core::ffi::c_void), COLORREF(PARENT_INK));
+            return LRESULT(PARENT_BRUSH.with(|b| b.get()));
+        }
+        windows::Win32::UI::WindowsAndMessaging::DefWindowProcW(hwnd, msg, wp, lp)
+    }
+
+    /// A `Button` subclass must not paint with the process-wide chrome table:
+    /// the face and the ink have to be the ones its own parent publishes on
+    /// `WM_CTLCOLORBTN`. The same answer is what `WM_CTLCOLORDLG` is routed to.
+    #[test]
+    fn the_button_face_and_ink_come_from_its_parent() {
+        use windows::core::{PCWSTR, w};
+        use windows::Win32::Graphics::Gdi::{
+            CreateCompatibleBitmap, CreateCompatibleDC, CreateSolidBrush, DeleteDC, DeleteObject,
+            GetDC, GetPixel, GetTextColor, ReleaseDC, SelectObject,
+        };
+        use windows::Win32::UI::WindowsAndMessaging::{
+            CreateWindowExW, DestroyWindow, GWLP_WNDPROC, HMENU, SetWindowLongPtrW,
+            WINDOW_EX_STYLE, WINDOW_STYLE, WS_CHILD, WS_POPUP,
+        };
+
+        unsafe {
+            let brush = CreateSolidBrush(COLORREF(PARENT_FACE));
+            PARENT_BRUSH.with(|b| b.set(brush.0 as isize));
+
+            let make = |class, parent, style| {
+                CreateWindowExW(
+                    WINDOW_EX_STYLE::default(),
+                    class,
+                    PCWSTR::null(),
+                    style,
+                    0,
+                    0,
+                    40,
+                    20,
+                    parent,
+                    Some(HMENU(0 as *mut core::ffi::c_void)),
+                    Some(super::super::view::instance()),
+                    None,
+                )
+                .expect("test window")
+            };
+            let parent = make(w!("STATIC"), None, WS_POPUP);
+            let _ = SetWindowLongPtrW(
+                parent,
+                GWLP_WNDPROC,
+                ctl_parent_proc as *const () as isize,
+            );
+            hook_dialog_colours(parent);
+            let child = make(w!("BUTTON"), Some(parent), WINDOW_STYLE(WS_CHILD.0));
+
+            let screen = GetDC(None);
+            let dc = CreateCompatibleDC(Some(screen));
+            let bmp = CreateCompatibleBitmap(screen, 40, 20);
+            let old_bmp = SelectObject(dc, HGDIOBJ(bmp.0));
+            let rc = RECT {
+                left: 0,
+                top: 0,
+                right: 40,
+                bottom: 20,
+            };
+
+            // The subclass's own paint: the parent's brush fills the rect and
+            // the parent's ink is what the caption will be drawn with.
+            let ink = fill_parent_face(child, dc, &rc);
+            assert_eq!(ink.0, PARENT_INK, "caption ink is the parent's");
+            assert_eq!(
+                GetPixel(dc, 5, 5).0,
+                PARENT_FACE,
+                "the rect is filled with the parent's brush"
+            );
+
+            // The dialog's own colour question goes to the very same answer.
+            SetTextColor(dc, COLORREF(0));
+            let routed = SendMessageW(
+                parent,
+                WM_CTLCOLORDLG,
+                Some(WPARAM(dc.0 as usize)),
+                Some(LPARAM(0)),
+            );
+            assert_eq!(routed.0, brush.0 as isize, "routed through the subclass");
+            assert_eq!(GetTextColor(dc).0, PARENT_INK, "and sets the ink again");
+
+            // A parent that leaves the question to DefWindowProc must not be
+            // mistaken for an answer: the chrome table is the fallback then.
+            let silent = make(w!("STATIC"), None, WS_POPUP);
+            let quiet_child = make(w!("BUTTON"), Some(silent), WINDOW_STYLE(WS_CHILD.0));
+            let saved = CHROME_CAPTION.load(Ordering::Acquire);
+            let saved_face = CHROME_FACE.load(Ordering::Acquire);
+            CHROME_CAPTION.store(0x00AB_CD_EF, Ordering::Release);
+            CHROME_FACE.store(0x0011_2233, Ordering::Release);
+            let fallback = fill_parent_face(quiet_child, dc, &rc);
+            CHROME_CAPTION.store(saved, Ordering::Release);
+            CHROME_FACE.store(saved_face, Ordering::Release);
+            assert_eq!(fallback.0, 0x00AB_CD_EF, "silent parent uses the table's ink");
+            assert_eq!(
+                GetPixel(dc, 5, 5).0,
+                0x0011_2233,
+                "and not the default proc's stock face brush"
+            );
+            let _ = DestroyWindow(quiet_child);
+            let _ = DestroyWindow(silent);
+
+            let _ = SelectObject(dc, old_bmp);
+            let _ = DeleteObject(HGDIOBJ(bmp.0));
+            let _ = DeleteDC(dc);
+            let _ = ReleaseDC(None, screen);
+            let _ = DestroyWindow(child);
+            let _ = DestroyWindow(parent);
+            let _ = DeleteObject(HGDIOBJ(brush.0));
+            PARENT_BRUSH.with(|b| b.set(0));
+        }
+    }
+
+    /// Only a stock list is taken over: an ownerdraw one paints its own rows
+    /// and must keep the theme that gives it a dark scrollbar.
+    #[test]
+    fn only_stock_list_styles_are_taken_over() {
+        assert!(is_stock_listbox(0x50A1_0101));
+        assert!(is_stock_listbox(0x50A1_0101 | 0x0200));
+        assert!(!is_stock_listbox(0x50A1_0101 | 0x0010));
+        assert!(!is_stock_listbox(0x50A1_0101 | 0x0020));
+    }
+
+    /// A stock list's rows are painted with the parent's field and ink, while
+    /// the window keeps the sub-app name that supplies its dark scrollbar —
+    /// the one thing un-naming it used to cost.
+    #[test]
+    fn a_themed_list_keeps_its_name_and_uses_the_parent_palette() {
+        use windows::core::{PCWSTR, w};
+        use windows::Win32::Graphics::Gdi::{
+            CreateCompatibleBitmap, CreateCompatibleDC, CreateSolidBrush, DeleteDC, DeleteObject,
+            GetDC, GetPixel, GetTextColor, ReleaseDC, SelectObject,
+        };
+        use windows::Win32::UI::WindowsAndMessaging::{
+            CreateWindowExW, DestroyWindow, GWLP_WNDPROC, HMENU, LB_ADDSTRING, SetWindowLongPtrW,
+            WINDOW_EX_STYLE, WINDOW_STYLE, WS_CHILD, WS_POPUP,
+        };
+
+        unsafe {
+            let brush = CreateSolidBrush(COLORREF(PARENT_FACE));
+            PARENT_BRUSH.with(|b| b.set(brush.0 as isize));
+            let parent = CreateWindowExW(
+                WINDOW_EX_STYLE::default(),
+                w!("STATIC"),
+                PCWSTR::null(),
+                WS_POPUP,
+                0,
+                0,
+                200,
+                90,
+                None,
+                Some(HMENU(0 as *mut core::ffi::c_void)),
+                Some(super::super::view::instance()),
+                None,
+            )
+            .expect("test parent");
+            let _ = SetWindowLongPtrW(
+                parent,
+                GWLP_WNDPROC,
+                ctl_parent_proc as *const () as isize,
+            );
+            let list = CreateWindowExW(
+                WINDOW_EX_STYLE::default(),
+                w!("LISTBOX"),
+                PCWSTR::null(),
+                WINDOW_STYLE(WS_CHILD.0 | 0x0020_0000), // WS_VSCROLL
+                0,
+                0,
+                120,
+                60,
+                Some(parent),
+                Some(HMENU(1200 as *mut core::ffi::c_void)), // control id
+                Some(super::super::view::instance()),
+                None,
+            )
+            .expect("test list");
+            let text: Vec<u16> = "alpha\0".encode_utf16().collect();
+            let _ = SendMessageW(
+                list,
+                LB_ADDSTRING,
+                None,
+                Some(LPARAM(text.as_ptr() as isize)),
+            );
+            let _ = SetWindowTheme(list, w!("DarkMode_Explorer"), PCWSTR::null());
+            themed_listbox(parent, 1200);
+
+            let screen = GetDC(None);
+            let dc = CreateCompatibleDC(Some(screen));
+            let bmp = CreateCompatibleBitmap(screen, 120, 60);
+            let old_bmp = SelectObject(dc, HGDIOBJ(bmp.0));
+            // PrintWindow reaches a control through WM_PRINTCLIENT.
+            let _ = SendMessageW(
+                list,
+                WM_PRINTCLIENT,
+                Some(WPARAM(dc.0 as usize)),
+                Some(LPARAM(2)), // PRF_CLIENT
+            );
+            assert_eq!(
+                GetPixel(dc, 5, 5).0,
+                PARENT_FACE,
+                "the first row is filled with the parent's field brush"
+            );
+            assert_eq!(
+                GetPixel(dc, 90, 40).0,
+                PARENT_FACE,
+                "and so is the empty space below the last row"
+            );
+            assert_eq!(
+                GetTextColor(dc).0,
+                PARENT_INK,
+                "and the caption ink is the parent's"
+            );
+
+            // Only meaningful when visual styles are on: a window whose theme
+            // name was cleared cannot open theme data at all.
+            let reference = CreateWindowExW(
+                WINDOW_EX_STYLE::default(),
+                w!("STATIC"),
+                PCWSTR::null(),
+                WINDOW_STYLE(WS_CHILD.0),
+                0,
+                0,
+                10,
+                10,
+                Some(parent),
+                Some(HMENU(0 as *mut core::ffi::c_void)),
+                Some(super::super::view::instance()),
+                None,
+            )
+            .expect("reference window");
+            let _ = SetWindowTheme(reference, w!("DarkMode_Explorer"), PCWSTR::null());
+            let baseline = OpenThemeData(Some(reference), w!("BUTTON"));
+            if baseline.0 != 0 {
+                let list_theme = OpenThemeData(Some(list), w!("BUTTON"));
+                assert!(
+                    list_theme.0 != 0,
+                    "the list still carries its dark sub-app name"
+                );
+                let _ = CloseThemeData(list_theme);
+                let _ = CloseThemeData(baseline);
+                // Calibration: an un-named window really cannot open theme
+                // data, so the check above would have caught the old fix.
+                let _ = SetWindowTheme(list, w!(" "), w!(" "));
+                let cleared = OpenThemeData(Some(list), w!("BUTTON"));
+                assert_eq!(
+                    cleared.0, 0,
+                    "clearing the name is what costs the dark scrollbar"
+                );
+                if cleared.0 != 0 {
+                    let _ = CloseThemeData(cleared);
+                }
+            }
+            let _ = DestroyWindow(reference);
+
+            let _ = SelectObject(dc, old_bmp);
+            let _ = DeleteObject(HGDIOBJ(bmp.0));
+            let _ = DeleteDC(dc);
+            let _ = ReleaseDC(None, screen);
+            let _ = DestroyWindow(list);
+            let _ = DestroyWindow(parent);
+            let _ = DeleteObject(HGDIOBJ(brush.0));
+            PARENT_BRUSH.with(|b| b.set(0));
+        }
     }
 }

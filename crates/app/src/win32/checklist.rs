@@ -198,6 +198,10 @@ pub(super) unsafe fn create_dialog<P: Panel>(
     let dark = chrome::theme_is_dark(theme);
     chrome::set_chrome_theme(theme);
     chrome::title_bar(dlg, dark);
+    // This one builds its own children and never goes through
+    // `dark_theme_children`, so the dialog's own colour question has to be
+    // hooked here.
+    chrome::hook_dialog_colours(dlg);
     Some(dlg)
 }
 
