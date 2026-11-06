@@ -43,6 +43,17 @@ impl ViewFlags {
     pub const RESTORE_WRAP: u32 = 36;
     /// It is a pure runtime latch.
     pub const BRACKET_HIGHLIGHT: u32 = 21;
+    /// 选区文本保持语法高亮的前景色 (`[Edit]/KeepSelFG`, 选项 → 编辑页):
+    /// 开 = 选区里的字保留自己那一份语法色，只剩底色换；关 = 选区里的字整段改用
+    /// 主题的选区前景（`Selection` 的第二色）。这一行不写就是关，所以出厂是涂选区
+    /// 前景那一种 —— 深色主题里选区前景和默认前景挨得很近，纯文字被选中看着只换了
+    /// 底色，选了语法着色的词才看得出来。
+    /// 这一位和下面那一位都不进 `bit_for_menu_id`：「查看」菜单没有它们的行，
+    /// 只有选项页有，所以位号接在视图选项之后，不复用任何菜单位。
+    pub const KEEP_SEL_FG: u32 = 37;
+    /// 选区文本的背景色扩展到窗口右侧 (`[Edit]/SelExtend`, 选项 → 编辑页):
+    /// 整行都落在选区里时，行尾那片空白也铺上选区底色。
+    pub const SEL_EXTEND: u32 = 38;
 
     pub fn get(self, bit: u32) -> bool {
         (self.0 >> bit) & 1 == 1
@@ -93,6 +104,8 @@ impl ViewFlags {
             Self::VSPACE => "VSpace",
             Self::INDENT_STYLE => "IndentStyle",
             Self::RESTORE_WRAP => "RestoreWrap",
+            Self::KEEP_SEL_FG => "KeepSelFG",
+            Self::SEL_EXTEND => "SelExtend",
             _ => return None,
         })
     }
@@ -280,5 +293,17 @@ mod tests {
                 .with_ini(|_| None)
                 .get(ViewFlags::INDENT_LINE)
         );
+        // 选区前景这一位出厂是关的：没写这一行 = 选区里的字涂主题的选区前景，
+        // 只有显式的 `Y` 才把语法色留住。
+        assert!(!ViewFlags::shipped_defaults()
+            .with_ini(|_| None)
+            .get(ViewFlags::KEEP_SEL_FG));
+        assert!(ViewFlags::shipped_defaults()
+            .with_ini(|k| if k == "KeepSelFG" {
+                Some("Y".to_string())
+            } else {
+                None
+            })
+            .get(ViewFlags::KEEP_SEL_FG));
     }
 }

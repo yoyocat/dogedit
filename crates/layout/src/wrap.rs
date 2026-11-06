@@ -234,17 +234,59 @@ impl WrapStore {
 /// and the full relayout.
 pub struct WrapEngine {
     pub store: WrapStore,
+    /// 断行禁则：不许顶在一行之首的字符（`Edit/NoHeadChars`）。
+    pub break_head: Vec<char>,
+    /// 断行禁则：不许留在一行之尾的字符（`Edit/NoTailChars`）。
+    pub break_tail: Vec<char>,
 }
 
 impl Default for WrapEngine {
     fn default() -> Self {
         Self {
             store: WrapStore::default(),
+            break_head: Vec::new(),
+            break_tail: Vec::new(),
         }
     }
 }
 
 impl WrapEngine {
+    /// 把断点挪到不犯禁则的位置上。`at` 是下一行的第一个字符，所以 `at` 那一格
+    /// 不能是行头禁排字，`at - 1` 那一格不能是行尾禁排字。犯了就往前挪一格再看，
+    /// 最多回退 32 格；`min_at` 是这一行至少得吃下的字符数，退到那里还躲不开就
+    /// 停在原地 —— 一整段都是禁则字符时，宁可让它犯一次，也不能排出一个空行。
+    ///
+    /// 关联函数而不是方法：调用点上 `store.arrays[fline]` 正被可变借用，走
+    /// `&self` 会撞车，而按字段分开借 `break_head` / `break_tail` 是允许的。
+    fn land(
+        at: usize,
+        min_at: usize,
+        chars: &[char],
+        head: &[char],
+        tail: &[char],
+    ) -> usize {
+        if head.is_empty() && tail.is_empty() {
+            return at;
+        }
+        let bad = |i: usize| -> bool {
+            chars.get(i).is_some_and(|c| head.contains(c))
+                || i > 0 && chars.get(i - 1).is_some_and(|c| tail.contains(c))
+        };
+        let mut at = at;
+        for _ in 0..32 {
+            if at <= min_at || at > chars.len() || !bad(at) {
+                break;
+            }
+            at -= 1;
+        }
+        at
+    }
+
+    /// 断行禁则要不要读这一行的字符：两串都空时一个字符也不该多解出来。
+    fn rules_on(&self) -> bool {
+        !self.break_head.is_empty() || !self.break_tail.is_empty()
+    }
+
     /// Wraps one folding line; returns the
     /// visual rows it contributes
     /// (`count + 1`).
@@ -265,6 +307,14 @@ impl WrapEngine {
         if let Some(cols) = wrapper.column_limit() {
             return self.wrap_line_columns(fline, text, cols, ctx);
         }
+        // 断行禁则（`Edit/NoHeadChars` / `Edit/NoTailChars`）要按字符看每个断点，
+        // 两串都空时一个字符也不该多解出来。
+        let rules = self.rules_on();
+        let chars: Vec<char> = if rules {
+            text.chars().collect()
+        } else {
+            Vec::new()
+        };
         self.store.ensure(fline + 1);
         let arr = &mut self.store.arrays[fline];
         arr.reset();
@@ -277,6 +327,8 @@ impl WrapEngine {
         let mut last_break: Option<usize> = None;
         let mut break_x: u32 = 0;
         let mut i = 0usize;
+        // 上一个断点：禁则往前挪时不许越过它，否则这一行就成了空行。
+        let mut prev_break = 0usize;
         // Line width in x-width units (tabs count their snap), for
         // the scrollbar range — mirrors `cells_of`.
         let mut width_px: u32 = 0;
@@ -300,8 +352,14 @@ impl WrapEngine {
                 // to the next row, where it re-snaps
                 // from zero.
                 if x > limit {
-                    arr.append(i as i32);
-                    x = tab_px;
+                    let at = Self::land(i, prev_break + 1, &chars, &self.break_head, &self.break_tail);
+                    prev_break = at;
+                    arr.append(at as i32);
+                    x = if at == i {
+                        tab_px
+                    } else {
+                        width_from(&chars, at, i, ctx.measurer, ctx.font, tab_px)
+                    };
                     last_break = None;
                     break_x = 0;
                 }
@@ -322,13 +380,18 @@ impl WrapEngine {
             width_px += w;
             x += w;
             if x > limit {
-                let at = last_break.unwrap_or(i);
+                let raw = last_break.unwrap_or(i);
+                let at = Self::land(raw, prev_break + 1, &chars, &self.break_head, &self.break_tail);
+                prev_break = at;
                 arr.append(at as i32);
                 // restart from the break point: word
                 // mode carries the width from the break
                 // to the current char, char mode just
-                // this character.
-                x = if last_break.is_some() {
+                // this character. 禁则把断点往前挪过时，那两笔账记的都是原来
+                // 的落点，只能照新的重量一遍。
+                x = if at != raw {
+                    width_from(&chars, at, i, ctx.measurer, ctx.font, tab_px)
+                } else if last_break.is_some() {
                     x - break_x
                 } else {
                     x - pre_x
@@ -369,6 +432,13 @@ impl WrapEngine {
         max_cols: u32,
         ctx: &mut LayoutCtx,
     ) -> usize {
+        // 断行禁则，和像素那一趟同一条规则。
+        let rules = self.rules_on();
+        let chars: Vec<char> = if rules {
+            text.chars().collect()
+        } else {
+            Vec::new()
+        };
         self.store.ensure(fline + 1);
         let arr = &mut self.store.arrays[fline];
         arr.reset();
@@ -377,6 +447,7 @@ impl WrapEngine {
         let char_count = text.chars().count();
         let mut col: u32 = 0;
         let mut total_cols: u32 = 0;
+        let mut prev_break = 0usize;
         for (i, ch) in text.chars().enumerate() {
             // CR/LF ends the walk (the line
             // terminator is stripped by
@@ -395,8 +466,27 @@ impl WrapEngine {
             col += advance;
             total_cols += advance;
             if col >= max_cols && i + 1 < char_count {
-                arr.append((i + 1) as i32);
-                col = 0;
+                let raw = i + 1;
+                let at = Self::land(raw, prev_break + 1, &chars, &self.break_head, &self.break_tail);
+                prev_break = at;
+                arr.append(at as i32);
+                // 挪过位置的那一行，开头的列数按同一套推进量重走一遍；没挪时
+                // `at == raw`，下一行从 0 开始，和原来一样。
+                col = if at == raw {
+                    0
+                } else {
+                    let mut c = 0u32;
+                    for k in at..=i {
+                        c += if chars[k] == '\t' {
+                            tab_cols - (c % tab_cols)
+                        } else if attaches_to_previous(chars[k]) {
+                            0
+                        } else {
+                            1
+                        };
+                    }
+                    c
+                };
             }
         }
         arr.cells = total_cols as i32;
@@ -427,6 +517,28 @@ impl WrapEngine {
 /// or punctuation.
 pub fn is_word_break(ch: char) -> bool {
     ch.is_whitespace() || ch.is_ascii_punctuation()
+}
+
+/// 断点被禁则往前挪过之后，新行开头的宽度只能重新量：原来那套累加记的是别的
+/// 落点，`break_x` 停在的是那个可断点的 x，往前退一格就少算了若干格。Tab 在
+/// 新行开头重新对齐一个制表位，和原来那条规则一致。
+fn width_from(
+    chars: &[char],
+    from: usize,
+    thru: usize,
+    measurer: &mut dyn TextMeasurer,
+    font: Font,
+    tab_px: u32,
+) -> u32 {
+    let mut w = 0u32;
+    for &c in &chars[from..=thru] {
+        w += if c == '\t' {
+            tab_px
+        } else {
+            measurer.char_width(c, font) as u32
+        };
+    }
+    w
 }
 
 /// Pixels → display columns, the `cells_of`

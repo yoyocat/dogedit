@@ -50,6 +50,7 @@ theme_tokens! {
     "editor.caret_glow" => caret_glow,
     "editor.caret_indicator" => sel_indicator,
     "editor.selection" => selection_bg,
+    "editor.selection_fg" => selection_fg,
     "editor.current_line" => current_line_bg,
     "editor.below" => below_bg,
     "editor.margin" => margin_bg,
@@ -167,10 +168,10 @@ mod tests {
         }
     }
 
-    /// 89 个颜色字段，一个都不能漏 —— 漏的那个表现为「皮肤里写了但没反应」。
+    /// 90 个颜色字段，一个都不能漏 —— 漏的那个表现为「皮肤里写了但没反应」。
     #[test]
     fn every_colour_field_has_a_token() {
-        assert_eq!(TOKEN_NAMES.len(), 89, "73 scalars + 2 x 8 markers");
+        assert_eq!(TOKEN_NAMES.len(), 90, "74 scalars + 2 x 8 markers");
     }
 
     /// 上面那条只数了总数，说不出漏的是哪一个。这条直接比对源码里的字段名：
@@ -198,7 +199,7 @@ mod tests {
                 fields.push(name.trim());
             }
         }
-        assert_eq!(fields.len(), 75, "扫到的字段数不对，检查 theme.rs 的写法");
+        assert_eq!(fields.len(), 76, "扫到的字段数不对，检查 theme.rs 的写法");
 
         let mut named: Vec<&str> = Vec::new();
         for line in TOKENS.lines() {

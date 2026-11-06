@@ -116,7 +116,7 @@ end)
 | `ctx.text` / `ctx.label` / `ctx.value` | 占位符对应的文字 |
 | `ctx.dpi` | 这一块解析到的 DPI |
 | `ctx.hot` / `ctx.active` / `ctx.pressed` / `ctx.disabled` / `ctx.checked` / `ctx.focus` / `ctx.selected` / `ctx.modified` / `ctx.alt` | 9 个布尔状态位，互相独立（按下并且改过并且有焦点是同时成立的） |
-| `ctx.theme["status.bg"]` | 当前主题的 89 个 token，值是 `"#RRGGBB"`。皮肤换主题时这张表跟着变，不用重新注册 |
+| `ctx.theme["status.bg"]` | 当前主题的 90 个 token，值是 `"#RRGGBB"`。皮肤换主题时这张表跟着变，不用重新注册 |
 | `ctx.doc` | 当前文档的只读快照（见下），8 个字段 |
 | `ctx.rows` | 只有 `editor.overlay` 有：可见行表（见「五之十一」）；别的区域是空数组，`#ctx.rows == 0` |
 | `ctx.metrics` | 编辑器字体的度量：`x_width` / `cjk_width` / `font_height` / `line_height` / `gutter_x` / `line_number_x` / `line_number_w`。同样只有编辑区那两个区域有 |
@@ -1145,7 +1145,7 @@ App.on("doc.saved",    function() App.ui.style:reset("tab.mark") end)
 ### 四组动词
 
 ```lua
--- 颜色：89 个 token，见主题文件的 [Theme]
+-- 颜色：90 个 token，见主题文件的 [Theme]
 style:set(token, color)         -- nil = 复位
 style:reset(token)
 style:get(token)                -- 生效值（含覆盖）；没这个 token 回 nil

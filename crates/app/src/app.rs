@@ -637,6 +637,17 @@ pub struct Editor {
     /// of matching
     /// into 1..=1024.
     sel_max_len: usize,
+    /// `Edit/KeepHighlight`（选项 → 编辑页「移动光标时保持选区或者查找高亮」，
+    /// 出厂 N）：选区塌掉后，上一次选字留下的「选中词全文高亮」是丢掉还是留着。
+    keep_highlight: bool,
+    /// `Edit/ScrollLimit`（选项 → 编辑页「当光标距边界?行时进行滚动」，出厂 0，
+    /// 大于 16 归 0）：翻页时留给自己的上下文行数。只有 PageUp/PageDown 用它，
+    /// 方向键和滚动条仍是贴边揭示。
+    scroll_limit: usize,
+    /// 刚刚自动补出的那一对括号中间的位置。`Edit/JumpWithTab`（选项 → 编辑页
+    /// 「按下Tab时跳出刚刚自动输入的配对字符」）认的就是这一格：光标还停在这
+    /// 里，Tab 才越过闭括号；走开了、或者被别的编辑挪动了，这一格自然对不上。
+    pub pair_jump: Option<(usize, usize)>,
     /// 高亮匹配: the active find query's matches as `(line, start, end)`
     /// char ranges, painted in the `Found` colours under the text like the
     /// selection-highlight occurrences. Empty while the option is off.
@@ -991,6 +1002,9 @@ impl Editor {
             sel_match_word: false,
             find_marks: Vec::new(),
             sel_max_len: 64,
+            keep_highlight: false,
+            scroll_limit: 0,
+            pair_jump: None,
             hl_stale: true,
             snapshot_requested: false,
             snapshot_epoch: None,
@@ -2579,19 +2593,31 @@ impl Editor {
     /// Otherwise the text with the case flag and the word-edge result. This
     /// implementation's per-line scan is cheap enough to ride the paint.
     fn update_sel_highlight(&mut self) {
-        self.sel_highlight_pat = None;
+        let pat = self.sel_highlight_pat_of();
+        match pat {
+            Some(pat) => self.sel_highlight_pat = Some(pat),
+            // 「移动光标时保持选区或者查找高亮」开着时，这一趟问不出模式不算换词：
+            // 上一次选字留下的模式继续画，直到真的一次选择问出新模式。关掉（出厂
+            // 值）就是塌掉即清。
+            None if self.keep_highlight => {}
+            None => self.sel_highlight_pat = None,
+        }
+    }
+
+    /// 当前选区对应的「选中词全文高亮」模式，问不出来就是 `None`。
+    fn sel_highlight_pat_of(&self) -> Option<SelHighlightPat> {
         // exactly one range, on one line — the shape a single
         // interval read answers
         if self.selection.ranges.len() != 1 {
-            return;
+            return None;
         }
         let r = &self.selection.ranges[0];
         if r.start.0 != r.end.0 {
-            return;
+            return None;
         }
         let len = r.end.1.saturating_sub(r.start.1);
         if len == 0 || len > self.sel_max_len {
-            return;
+            return None;
         }
         let chars = self.line_chars(r.start.0);
         let sel: String = chars
@@ -2599,7 +2625,7 @@ impl Editor {
             .map(|s| s.iter().collect())
             .unwrap_or_default();
         if sel.is_empty() || sel.chars().all(char::is_whitespace) {
-            return;
+            return None;
         }
         // the word-edge check (`Edit/QuickSmart`): both edges must
         // sit on a boundary — the selection at the line's edge, or
@@ -2618,11 +2644,11 @@ impl Editor {
         } else {
             false
         };
-        self.sel_highlight_pat = Some(SelHighlightPat {
+        Some(SelHighlightPat {
             text: sel,
             case_sensitive: self.sel_match_case,
             whole_word,
-        });
+        })
     }
 
     /// The occurrences of the selection-highlight pattern on one line as
@@ -3311,6 +3337,19 @@ impl Editor {
         draw.fill(r(rect.x + rect.w - 1.0, rect.y, 1.0, rect.h), color);
     }
 
+    /// 光标落点之后的揭示。翻页先按 `Edit/ScrollLimit` 把光标停在离窗口边
+    /// `limit` 行的地方，再走普通的揭示：留边小于一整屏，所以那一步在竖直方向
+    /// 上不会再动，补的只是横向和光标历史。方向键、滚轮、滚动条都不走这一档，
+    /// 直接是贴边揭示。
+    fn reveal_after_motion(&mut self, dir: MoveDir, page: usize) {
+        if matches!(dir, MoveDir::PageUp | MoveDir::PageDown) && self.scroll_limit > 0 {
+            let (row, _) = self.caret_row();
+            let row = row.max(0) as usize;
+            self.reveal_rows(row, page, self.scroll_limit);
+        }
+        self.ensure_caret_visible(page);
+    }
+
     /// The one caret primitive, shared by every `cm_move_*` and its
     /// `cm_select_*` twin. The select handlers differ only in that they keep
     /// the far edge of the selection as the anchor instead of collapsing it
@@ -3334,7 +3373,7 @@ impl Editor {
                         end: to,
                     });
                 }
-                self.ensure_caret_visible(page);
+                self.reveal_after_motion(dir, page);
                 return;
             }
             self.collapse_selection(dir);
@@ -3359,7 +3398,7 @@ impl Editor {
                 });
             }
         }
-        self.ensure_caret_visible(page);
+        self.reveal_after_motion(dir, page);
     }
 
     /// The fixed edge of an extending move: the end of the live selection that the caret is
@@ -4637,17 +4676,26 @@ impl Editor {
         Some(p)
     }
 
+    /// 竖直方向的揭示：把 `row` 收进 `[first_row, first_row + page)`。
+    /// `context` 是这一行上下各自留出的上下文行数 —— 翻页的滚动留边
+    /// （`Edit/ScrollLimit`）走的就是这一档，普通揭示传 0，也就是贴边。
+    /// 留边不小于一整屏时等于没留，翻页条件本身就不成立。
+    fn reveal_rows(&mut self, row: usize, page: usize, context: usize) {
+        let context = if context >= page { 0 } else { context };
+        if self.first_row + context > row {
+            self.first_row = row.saturating_sub(context);
+        } else if row + context >= self.first_row + page {
+            self.first_row = (row + context + 1).saturating_sub(page);
+        }
+    }
+
     /// the caret reveal — bring the caret back into the visible rectangle, in cells
     /// horizontally and in rows vertically. This asks [`Self::caret_row`] rather than
     /// counting the column: a line with a tab is wider in pixels than it is in characters.
     pub fn ensure_caret_visible(&mut self, page: usize) {
         let (row, px) = self.caret_row();
         let row = row.max(0) as usize;
-        if row < self.first_row {
-            self.first_row = row;
-        } else if row >= self.first_row + page {
-            self.first_row = row - page + 1;
-        }
+        self.reveal_rows(row, page, 0);
         // A non-empty text rectangle. The delta is whole cells, and the caret is
         // never left flush against an edge — 10 cells of context on the left, 40
         // px plus 10 cells on the right.
@@ -5385,6 +5433,26 @@ impl Editor {
 
     pub fn sel_max_len(&self) -> usize {
         self.sel_max_len
+    }
+
+    /// `Edit/KeepHighlight`（选项 → 编辑页，出厂 N）：选区塌掉后留着上一次的
+    /// 「选中词全文高亮」，还是跟着一起清。
+    pub fn set_keep_highlight(&mut self, on: bool) {
+        self.keep_highlight = on;
+    }
+
+    pub fn keep_highlight(&self) -> bool {
+        self.keep_highlight
+    }
+
+    /// `Edit/ScrollLimit`（选项 → 编辑页，0~16，出厂 0）：翻页留给自己的
+    /// 上下文行数。界面上限是 16，写超了归 0 —— 和选项页读进来时同一套钳位。
+    pub fn set_scroll_limit(&mut self, lines: usize) {
+        self.scroll_limit = if lines > 16 { 0 } else { lines };
+    }
+
+    pub fn scroll_limit(&self) -> usize {
+        self.scroll_limit
     }
 
     /// Headless end-to-end check: load, layout,
@@ -8290,6 +8358,39 @@ mod highlight_tests {
         assert_eq!((occ[0].0, occ[0].1), (3, 6));
         // line 2: no match.
         assert!(e.sel_highlight_occurrences(2).is_empty());
+    }
+
+    /// 「移动光标时保持选区或者查找高亮」：关掉（出厂值）时选区一塌，全文高亮
+    /// 跟着没；打开时留着上一次选的那个字，直到下一次真选出新的字。
+    #[test]
+    fn keep_highlight_survives_a_collapsed_selection() {
+        for keep in [false, true] {
+            let mut e = editor("btn + btnx\nok btn ok\nplain");
+            e.set_keep_highlight(keep);
+            e.selection.add(Range {
+                start: (0, 0),
+                end: (0, 3),
+            });
+            e.update_sel_highlight();
+            assert!(!e.sel_highlight_occurrences(1).is_empty(), "选中的时候总该有");
+            // 光标一动，选区塌掉。
+            e.selection.clear();
+            e.update_sel_highlight();
+            assert_eq!(
+                !e.sel_highlight_occurrences(1).is_empty(),
+                keep,
+                "KeepHighlight={keep}"
+            );
+            // 真选出新的字，两种姿态都跟着换。
+            e.selection.clear();
+            e.selection.add(Range {
+                start: (1, 0),
+                end: (1, 2),
+            });
+            e.update_sel_highlight();
+            assert!(e.sel_highlight_occurrences(0).is_empty(), "换词后要按新的词来");
+            assert_eq!(e.sel_highlight_occurrences(1).len(), 1, "同一行的另一处 ok");
+        }
     }
 
     /// 1313: a multi-line selection, an all-whitespace one and

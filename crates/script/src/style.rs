@@ -847,7 +847,7 @@ mod tests {
             assert(App.theme.color("tab.mark") == "#E67E22", "覆盖要跟着")
             local n = 0
             for _ in pairs(App.theme.list()) do n = n + 1 end
-            assert(n == 89, "全部 token，实际 " .. n)
+            assert(n == 90, "全部 token，实际 " .. n)
             "##,
         );
     }

@@ -999,6 +999,79 @@ pub(super) struct SplitState {
     pub second_tabs: Vec<u64>,
 }
 
+/// 「选项 → 编辑」这一页里，没有「查看」菜单行、因而不在 `ViewFlags` 那套位里的
+/// 项。出厂值和读法都收在这里，调用方只管把「键名 → 值」递进来 —— 递文件的也行，
+/// 递一张表的也行，所以接线是能被测试钉住的。
+struct EditPage {
+    keep_highlight: bool,
+    col_one: bool,
+    jump_with_tab: bool,
+    scroll_limit: usize,
+    /// 「强制剪贴板的换行符格式」：0 不强转，1=CRLF、2=LF、3=CR。
+    clip_format: u32,
+    keep_sel_fg: bool,
+    sel_extend: bool,
+    no_head: Vec<char>,
+    no_tail: Vec<char>,
+    full_width_pair: Vec<char>,
+}
+
+impl EditPage {
+    /// `Y`/`N`，也认手写的 `1`/`0`；没写这一行才是出厂值。
+    fn flag(lookup: &impl Fn(&str) -> Option<String>, key: &str, default: bool) -> bool {
+        lookup(key)
+            .map(|v| {
+                let v = v.trim();
+                if v.eq_ignore_ascii_case("Y") || v == "1" {
+                    true
+                } else if v.eq_ignore_ascii_case("N") || v == "0" {
+                    false
+                } else {
+                    default
+                }
+            })
+            .unwrap_or(default)
+    }
+
+    fn of(lookup: impl Fn(&str) -> Option<String>) -> Self {
+        let number = |key: &str, default: usize| {
+            lookup(key)
+                .and_then(|v| v.trim().parse::<usize>().ok())
+                .unwrap_or(default)
+        };
+        Self {
+            keep_highlight: Self::flag(&lookup, "KeepHighlight", false),
+            col_one: Self::flag(&lookup, "ColOne", false),
+            jump_with_tab: Self::flag(&lookup, "JumpWithTab", true),
+            // 没写这一行 = 关，也就是选区里的字涂主题的选区前景；写 Y 才留住语法色。
+            keep_sel_fg: Self::flag(&lookup, "KeepSelFG", false),
+            sel_extend: Self::flag(&lookup, "SelExtend", false),
+            // 出厂 1，也就是把粘进来的换行统一成 CRLF；0 是不强转。
+            clip_format: number("ClipFormat", 1) as u32,
+            // 滚动留边的界面写的是 0~16，写超了归 0 —— 和选项页读进来时同一条。
+            scroll_limit: {
+                let n = number("ScrollLimit", 0);
+                if n > 16 {
+                    0
+                } else {
+                    n
+                }
+            },
+            // 断行禁则的两串字符各按各的字符查，不按位置配对：出厂值里前一串
+            // 15 个字、后一串 6 个字，本来就不是配对的写法。
+            no_head: lookup("NoHeadChars").unwrap_or_default().chars().collect(),
+            no_tail: lookup("NoTailChars").unwrap_or_default().chars().collect(),
+            // 「中文括号(必须配对输入)」：选项页写回时已经去过空格，这里再防
+            // 一次手写的。
+            full_width_pair: lookup("FullWidthPair")
+                .unwrap_or_default()
+                .chars()
+                .filter(|c| !c.is_whitespace())
+                .collect(),
+        }
+    }
+}
+
 pub(super) struct EditorState {
     pub(super) docs: Docs,
     /// 自动备份：设置、轮转游标、定时器状态。
@@ -1061,6 +1134,20 @@ pub(super) struct EditorState {
     /// `Url` / `Email` keys. Frame-global, persisted as
     /// `Edit/UrlHighlight`.
     url_highlight: bool,
+    /// 光标列号从1开始计数 (`Edit/ColOne`, 选项 → 编辑页): 状态栏「列」那格
+    /// 报的是光标左边有几个字（出厂值），还是从 1 数起的第几列。只改这一格的
+    /// 读数，跳转框、坐标命中都还是内部的 0 基。
+    pub(super) col_one: bool,
+    /// 按下Tab时跳出刚刚自动输入的配对字符 (`Edit/JumpWithTab`, 选项 → 编辑页,
+    /// 出厂 Y): 光标停在刚自动补出的那一对中间时，Tab 不写缩进，只越过闭括号。
+    jump_with_tab: bool,
+    /// 强制剪贴板的换行符格式 (`Edit/ClipFormat`, 选项 → 编辑页, 出厂 1):
+    /// 粘贴进来的文本里换行统一成哪一种。0 不强转，1=CRLF、2=LF、3=CR。
+    clip_format: u32,
+    /// 中文括号(必须配对输入) (`Edit/FullWidthPair`, 选项 → 编辑页): 用户补进
+    /// 配对集合的全角字符，写法是**相邻两字为一对** —— `（）【】` 就是「（配）」
+    /// 和「【配】」两对。出厂是空串，也就是不补。空格在选项页写回时就去了。
+    full_width_pair: Vec<char>,
     /// 监视剪贴板 (cm_doc_monitorclipboard, 1651): the frame sits in the
     /// clipboard viewer chain and pastes whatever is copied or cut.
     watch_clipboard: bool,
@@ -5910,6 +5997,10 @@ impl EditorState {
             color_highlight: false,
             sel_highlight: true,
             url_highlight: true,
+            col_one: false,
+            jump_with_tab: true,
+            clip_format: 1,
+            full_width_pair: Vec::new(),
             watch_clipboard: false,
             next_clipboard_viewer: HWND::default(),
             last_clip_write: String::new(),
@@ -6136,6 +6227,9 @@ impl EditorState {
             doc.theme.line_spacing = line_spacing;
             doc.theme.apply_line_spacing(standard_line_h);
         }
+        // 「选项 → 编辑」页剩下的那几项，同一份 `setting.ini`，同一趟。启动时
+        // 还没有排过版，折行禁则改没改都不用重排。
+        let _ = state.load_edit_page();
         // 解析器插件包：扫描插件根目录，再套上 `[Syntax] Disabled`
         // （parser_plugin_plan.md §4/§5）。
         state.load_syntax_config();
@@ -6442,6 +6536,49 @@ impl EditorState {
     /// than off.
     fn initial_view_flags(&self) -> dg_render::ViewFlags {
         dg_render::ViewFlags::shipped_defaults().with_ini(|key| self.setting_key(key))
+    }
+
+    /// 「选项 → 编辑」页里那几项没有「查看」菜单行的设置，从 `setting.ini` 落进
+    /// 内存。启动时读一次，选项页按下「应用」再读一次 —— 少了后一步就是「对话框
+    /// 改了、屏幕上不动」。
+    ///
+    /// 两个选区绘制开关走文档自己的视图位（和 `MiniMap` 那些同一套），所以逐份
+    /// 文档写；只写这两位的值，不整体重刷掩码 —— 掩码里其余的位是用户在菜单上
+    /// 按出来的，各篇文档可以不一样。
+    ///
+    /// 返回折行禁则有没有变过：变过就得重排，行是按禁则断的，不重排屏幕上还是
+    /// 旧的那些断点。
+    fn load_edit_page(&mut self) -> bool {
+        let page = EditPage::of(|key| self.setting_key(key));
+        let EditPage {
+            keep_highlight,
+            col_one,
+            jump_with_tab,
+            scroll_limit,
+            clip_format,
+            keep_sel_fg,
+            sel_extend,
+            no_head,
+            no_tail,
+            full_width_pair,
+        } = page;
+        self.col_one = col_one;
+        self.jump_with_tab = jump_with_tab;
+        self.clip_format = clip_format;
+        self.full_width_pair = full_width_pair;
+        let rules_changed = self
+            .docs
+            .iter()
+            .any(|d| d.wrap.break_head != no_head || d.wrap.break_tail != no_tail);
+        for doc in self.docs.iter_mut() {
+            doc.set_keep_highlight(keep_highlight);
+            doc.set_scroll_limit(scroll_limit);
+            doc.view_flags.set(dg_render::ViewFlags::KEEP_SEL_FG, keep_sel_fg);
+            doc.view_flags.set(dg_render::ViewFlags::SEL_EXTEND, sel_extend);
+            doc.wrap.break_head = no_head.clone();
+            doc.wrap.break_tail = no_tail.clone();
+        }
+        rules_changed
     }
 
     /// Applies the theme with the
@@ -8270,12 +8407,19 @@ impl EditorState {
         // document it was made from would look like the settings were ignored.
         editor.folding_method = current.folding_method;
         editor.view_flags = current.view_flags;
+        // 断行禁则是排版的输入之一：新页签要按同一套规则断行，否则同样的文本在
+        // 两篇文档里断在不同地方。
+        editor.wrap.break_head = current.wrap.break_head.clone();
+        editor.wrap.break_tail = current.wrap.break_tail.clone();
         // The occurrence highlight's match options ride along
         // with the rest of the per-document look: a new tab made
         // from one with case-sensitive matching keeps it.
         editor.set_sel_match_case(current.sel_match_case());
         editor.set_sel_match_word(current.sel_match_word());
         editor.set_sel_max_len(current.sel_max_len());
+        // 「选项 → 编辑」那两项同理：新页签不该丢掉保持高亮和翻页留边。
+        editor.set_keep_highlight(current.keep_highlight());
+        editor.set_scroll_limit(current.scroll_limit());
         // A new document sees the same list the document on screen has.
         editor.markers = current.markers.clone();
         editor.untitled_no = Some(self.docs.next_untitled_no());
@@ -12585,7 +12729,7 @@ impl EditorState {
         if self.auto_pair {
             let (line, col) = self.docs.act_mut().caret;
             if self.docs.act_mut().selection.is_empty() {
-                if pair_open(ch).is_some() {
+                if self.opener_of(ch).is_some() {
                     let mut buf = String::new();
                     self.docs.act_mut().doc.line_text(line, &mut buf);
                     if buf.chars().nth(col) == Some(ch) {
@@ -12601,7 +12745,7 @@ impl EditorState {
                         return;
                     }
                 }
-                if let Some(closer) = pair_close(ch) {
+                if let Some(closer) = self.closer_of(ch) {
                     let at = Pos { line, col };
                     let pair = format!("{ch}{closer}");
                     self.docs.act_mut().apply_insert(at, &pair);
@@ -12615,6 +12759,9 @@ impl EditorState {
                     }
                     self.schedule_syntax(hwnd);
                     self.docs.act_mut().caret = (line, col + 1);
+                    // 闩记下这一对：光标还夹在中间时，Tab 越过闭括号而不写缩进
+                    // （`Edit/JumpWithTab`）。
+                    self.docs.act_mut().pair_jump = Some((line, col + 1));
                     self.relayout_after_edit(hwnd);
                     let vr = self.visible_rows();
                     self.docs.act_mut().ensure_caret_visible(vr);
@@ -12624,7 +12771,7 @@ impl EditorState {
                     }
                     return;
                 }
-            } else if let Some(closer) = pair_close(ch) {
+            } else if let Some(closer) = self.closer_of(ch) {
                 // wrap the selection in
                 // the pair
                 let (s, e) = self.selection_pos_range();
@@ -19482,6 +19629,49 @@ impl EditorState {
         }
     }
 
+    /// 「按下Tab时跳出刚刚自动输入的配对字符」：闩还成立时，Tab 走
+    /// `cm_move_jumpoutofpair` 那条命令 —— 和键位表把它绑到别的键上是同一条
+    /// 路径，命令自己那套补全/片段收尾也一起走到。不成立就什么都不动，让正常的
+    /// Tab 接手。
+    fn tab_jumps_the_pair_just_inserted(&mut self, hwnd: HWND) -> bool {
+        if !self.jump_with_tab {
+            return false;
+        }
+        let ed = self.docs.act();
+        if !ed.selection.is_empty() || !ed.extra_carets.is_empty() {
+            return false;
+        }
+        if ed.pair_jump != Some(ed.caret) {
+            return false;
+        }
+        self.docs.act_mut().pair_jump = None;
+        let page = self.visible_rows();
+        self.run_command(hwnd, Command::JumpOutOfPair, page)
+    }
+
+    /// 配对集合里的闭括号：内置那一组，再加上「中文括号(必须配对输入)」里用户
+    /// 补上的成对字符。补上的写法是相邻两字为一对，落单的最后一个字不算。
+    fn closer_of(&self, ch: char) -> Option<char> {
+        if let Some(c) = pair_close(ch) {
+            return Some(c);
+        }
+        self.full_width_pair
+            .chunks(2)
+            .find(|p| p.first() == Some(&ch))
+            .and_then(|p| p.get(1).copied())
+    }
+
+    /// 闭括号对应的开括号（`closer_of` 的反向）。
+    fn opener_of(&self, ch: char) -> Option<char> {
+        if let Some(c) = pair_open(ch) {
+            return Some(c);
+        }
+        self.full_width_pair
+            .chunks(2)
+            .find(|p| p.get(1) == Some(&ch))
+            .and_then(|p| p.first().copied())
+    }
+
     /// Tab: insert a tab-stop character (the wrap
     /// engine snaps tabs to the next tab stop).
     /// 软空格 swaps the unit: the key fills up to
@@ -19494,6 +19684,12 @@ impl EditorState {
             return;
         }
         self.snippet_cancel();
+        // 「按下Tab时跳出刚刚自动输入的配对字符」：光标还夹在刚自动补出的那一
+        // 对中间时，Tab 往文档里什么都不写，只越过闭括号。越过之后闩就交出去，
+        // 再按 Tab 恢复正常缩进。
+        if self.tab_jumps_the_pair_just_inserted(hwnd) {
+            return;
+        }
         let soft = self.docs.act().view_flags.get(dg_render::ViewFlags::SOFT_TAB);
         if !soft && !self.docs.act_mut().extra_carets.is_empty() {
             self.insert_text_multi(hwnd, "\t");
@@ -22658,6 +22854,9 @@ impl EditorState {
         if !self.editable() {
             return;
         }
+        // 「强制剪贴板的换行符格式」：落进文档之前先把这一段里的换行统一。
+        let converted = force_line_ending(text, self.clip_format);
+        let text = converted.as_str();
         let (start, end) = self.selection_span();
         self.docs.act_mut().selection.clear();
         self.docs.act_mut().apply_replace(start, end, text);
@@ -22796,7 +22995,7 @@ impl EditorState {
                 if col <= chars.len() {
                     let prev = chars[col - 1];
                     let next = chars.get(col).copied();
-                    if let Some(closer) = pair_close(prev) {
+                    if let Some(closer) = self.closer_of(prev) {
                         if next == Some(closer) {
                             let s = Pos {
                                 line,
@@ -23265,17 +23464,46 @@ impl EditorState {
     }
 }
 
-/// Auto-pair table (setting.ini
-/// NoTailChars `([{（【｛` → the
-/// matching NoHeadChars closer).
+/// 「强制剪贴板的换行符格式」：把一段文本里的换行统一成 `format` 那一种。
+/// 0 是不强转、原样返回；1=CRLF、2=LF、3=CR。`\r\n` 是一个换行而不是两个，
+/// 所以先整对吃掉，再单独看落单的 `\r` 和 `\n`。
+fn force_line_ending(text: &str, format: u32) -> String {
+    let term = match format {
+        1 => "\r\n",
+        2 => "\n",
+        3 => "\r",
+        _ => return text.to_string(),
+    };
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\r' {
+            let _ = chars.next_if_eq(&'\n');
+            out.push_str(term);
+        } else if c == '\n' {
+            out.push_str(term);
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
+/// 自动配对表里内置的那一组开括号：半角括号和两种引号。用户补上的成对字符走
+/// `EditorState::closer_of`，也就是这一组加上 `Edit/FullWidthPair`。
+///
+/// 全角括号**不在**这一组里：它们要由「中文括号(必须配对输入)」填进来才参与
+/// 配对，出厂那一项是空，所以默认打 `（` 不补对。
+///
+/// 「禁止出现在行头/行尾的字符」也不是这张表：那两串管的是自动换行时断点不许
+/// 把标点落在行首或行尾，读它们的是折行那一侧。
 fn pair_close(ch: char) -> Option<char> {
     match ch {
         '(' => Some(')'),
         '[' => Some(']'),
         '{' => Some('}'),
-        '（' => Some('）'),
-        '【' => Some('】'),
-        '｛' => Some('｝'),
+        '\'' => Some('\''),
+        '"' => Some('"'),
         _ => None,
     }
 }
@@ -23287,9 +23515,8 @@ fn pair_open(ch: char) -> Option<char> {
         ')' => Some('('),
         ']' => Some('['),
         '}' => Some('{'),
-        '）' => Some('（'),
-        '】' => Some('【'),
-        '｝' => Some('｛'),
+        '\'' => Some('\''),
+        '"' => Some('"'),
         _ => None,
     }
 }
@@ -26833,6 +27060,13 @@ unsafe extern "system" fn window_proc(
             // 选项's 应用 button wrote the file while the dialog is still open.
             if let Some(st) = state_mut(hwnd) {
                 st.reload_toolbar(hwnd);
+                // 「选项 → 编辑」那一页没有菜单行的几项也刚可能改过：重读，然后
+                // 整窗重画 —— 选区的两个绘制开关改的是已经画在屏上的东西，禁则
+                // 改过还得重排，否则行的断点还是旧的。
+                if st.load_edit_page() {
+                    st.relayout(hwnd);
+                }
+                let _ = unsafe { InvalidateRect(Some(hwnd), None, false) };
                 // 备份那几项也可能刚改过：重读，定时器跟着 arm 或停。
                 st.backup.reload();
                 st.sync_backup_timer(hwnd);
@@ -28671,6 +28905,102 @@ mod multi_caret_tests {
 }
 
 #[cfg(test)]
+mod clip_format_tests {
+    use super::*;
+
+    /// 0 原样；1/2/3 各成一种。`\r\n` 是一个换行，不是两个。
+    #[test]
+    fn the_forced_ending_replaces_every_shape() {
+        assert_eq!(force_line_ending("a\r\nb\nc\rd", 0), "a\r\nb\nc\rd");
+        assert_eq!(force_line_ending("a\r\nb\nc\rd", 1), "a\r\nb\r\nc\r\nd");
+        assert_eq!(force_line_ending("a\r\nb\nc\rd", 2), "a\nb\nc\nd");
+        assert_eq!(force_line_ending("a\r\nb\nc\rd", 3), "a\rb\rc\rd");
+        assert_eq!(force_line_ending("", 1), "");
+        // 出厂值是 1。
+        assert_eq!(EditPage::of(|_| None).clip_format, 1);
+    }
+
+    /// 粘贴这一趟真的过了一遍转换，而不是只把值写进配置文件。
+    #[test]
+    fn a_paste_lands_in_the_forced_ending() {
+        let mut st = EditorState::new().expect("GDI");
+        let hwnd = HWND(std::ptr::null_mut());
+        st.clip_format = 2;
+        st.paste_text(hwnd, "one\r\ntwo\r\n");
+        assert_eq!(st.docs.act_mut().doc.to_text(), "one\ntwo\n");
+        assert_eq!(st.docs.act().doc.line_count(), 3);
+    }
+}
+
+#[cfg(test)]
+mod edit_page_tests {
+    use super::*;
+
+    fn page(rows: &[(&str, &str)]) -> EditPage {
+        EditPage::of(|key| {
+            rows.iter()
+                .find(|(k, _)| *k == key)
+                .map(|(_, v)| (*v).to_string())
+        })
+    }
+
+    /// 出厂值：这一页除了「按下Tab时跳出刚刚自动输入的配对字符」全是关，
+    /// 数字项是 0，三串字符都是空。
+    #[test]
+    fn an_absent_page_is_the_default_one() {
+        let p = page(&[]);
+        assert!(
+            !p.keep_highlight && !p.col_one && !p.keep_sel_fg && !p.sel_extend,
+            "复选框出厂都是关"
+        );
+        assert!(p.jump_with_tab, "Tab 跳出配对是出厂开的那一项");
+        assert_eq!(p.scroll_limit, 0);
+        assert!(p.no_head.is_empty() && p.no_tail.is_empty() && p.full_width_pair.is_empty());
+    }
+
+    /// 这一页的每一个键都得有人读。少一个接线，界面上就是「改了、屏幕上不动」，
+    /// 而 setting.ini 里照样写着新值 —— 所以这张表按行钉一遍。
+    #[test]
+    fn every_row_of_the_edit_page_is_read() {
+        let p = page(&[
+            ("KeepHighlight", "Y"),
+            ("ColOne", "Y"),
+            ("JumpWithTab", "N"),
+            ("KeepSelFG", "Y"),
+            ("SelExtend", "Y"),
+            ("ScrollLimit", "5"),
+            ("ClipFormat", "2"),
+            ("NoHeadChars", "!),.:;?]}"),
+            ("NoTailChars", "([{"),
+            ("FullWidthPair", "（）〈〉"),
+        ]);
+        assert!(p.keep_highlight && p.col_one && p.keep_sel_fg && p.sel_extend);
+        assert!(!p.jump_with_tab);
+        assert_eq!(p.scroll_limit, 5);
+        assert_eq!(p.clip_format, 2);
+        assert_eq!(p.no_head, vec!['!', ')', ',', '.', ':', ';', '?', ']', '}']);
+        assert_eq!(p.no_tail, vec!['(', '[', '{']);
+        assert_eq!(p.full_width_pair, vec!['（', '）', '〈', '〉']);
+    }
+
+    /// 手写的 ini 认 `1`/`0`，也认带空格的数；留边超过界面的 16 归 0，和选项页
+    /// 读初值时同一条钳法。
+    #[test]
+    fn handwritten_shapes_read_the_same_way() {
+        assert!(page(&[("ColOne", "1")]).col_one);
+        assert!(!page(&[("JumpWithTab", "0")]).jump_with_tab);
+        // 这一项手写的 1/0 也认。
+        assert!(page(&[("KeepSelFG", "1")]).keep_sel_fg);
+        assert!(!page(&[("KeepSelFG", "0")]).keep_sel_fg);
+        assert_eq!(page(&[("ScrollLimit", " 12 ")]).scroll_limit, 12);
+        assert_eq!(page(&[("ScrollLimit", "40")]).scroll_limit, 0);
+        assert_eq!(page(&[("ScrollLimit", "不是数")]).scroll_limit, 0);
+        // 配对串里的空格不算字符。
+        assert_eq!(page(&[("FullWidthPair", "《 》")]).full_width_pair, vec!['《', '》']);
+    }
+}
+
+#[cfg(test)]
 mod auto_pair_tests {
     use super::*;
 
@@ -28710,13 +29040,34 @@ mod auto_pair_tests {
         assert!(st.docs.act_mut().selection.is_empty());
     }
 
+    /// 全角括号不在内置那一组里：默认打 `（` 就只是一个字，要「中文括号(必须
+    /// 配对输入)」填了才补对。
     #[test]
-    fn insert_char_auto_pair_cjk() {
+    fn insert_char_auto_pair_cjk_needs_the_option() {
         let mut st = EditorState::new().expect("GDI");
         let hwnd = HWND(std::ptr::null_mut());
         st.insert_char(hwnd, '\u{ff08}');
-        assert_eq!(st.docs.act_mut().doc.to_text(), "\u{ff08}\u{ff09}");
+        assert_eq!(st.docs.act_mut().doc.to_text(), "\u{ff08}");
         assert_eq!(st.docs.act_mut().caret, (0, 1));
+        st.full_width_pair = "\u{ff08}\u{ff09}".chars().collect();
+        st.docs.act_mut().caret = (0, 1);
+        st.insert_char(hwnd, '\u{ff08}');
+        assert_eq!(st.docs.act_mut().doc.to_text(), "\u{ff08}\u{ff08}\u{ff09}");
+        assert_eq!(st.docs.act_mut().caret, (0, 2));
+    }
+
+    /// 引号是内置那一组里的自配对：打一个补成一对、光标停在中间，再打一个是
+    /// 越过后面那个，而不是写出两个。
+    #[test]
+    fn insert_char_auto_pair_quotes() {
+        let mut st = EditorState::new().expect("GDI");
+        let hwnd = HWND(std::ptr::null_mut());
+        st.insert_char(hwnd, '"');
+        assert_eq!(st.docs.act_mut().doc.to_text(), "\"\"");
+        assert_eq!(st.docs.act_mut().caret, (0, 1));
+        st.insert_char(hwnd, '"');
+        assert_eq!(st.docs.act_mut().doc.to_text(), "\"\"");
+        assert_eq!(st.docs.act_mut().caret, (0, 2));
     }
 
     #[test]
@@ -28727,6 +29078,72 @@ mod auto_pair_tests {
         st.insert_char(hwnd, '(');
         assert_eq!(st.docs.act_mut().doc.to_text(), "(");
         assert_eq!(st.docs.act_mut().caret, (0, 1));
+    }
+
+    /// 「按下Tab时跳出刚刚自动输入的配对字符」（出厂 Y）：刚自动补出的那一对
+    /// 还夹在光标两边时，Tab 越过闭括号而不写缩进；闩只用一次，再按就是正常
+    /// 的 Tab。
+    #[test]
+    fn tab_jumps_over_the_pair_just_inserted() {
+        let mut st = EditorState::new().expect("GDI");
+        let hwnd = HWND(std::ptr::null_mut());
+        st.insert_char(hwnd, '(');
+        assert_eq!(st.docs.act().pair_jump, Some((0, 1)));
+        st.insert_tab(hwnd);
+        assert_eq!(st.docs.act_mut().doc.to_text(), "()", "Tab 不往文档里写字");
+        assert_eq!(st.docs.act_mut().caret, (0, 2));
+        assert_eq!(st.docs.act().pair_jump, None, "闩用过就交出去");
+        // 第二次按 Tab 回到正常缩进。
+        st.insert_tab(hwnd);
+        assert_eq!(st.docs.act_mut().doc.to_text(), "()\t");
+    }
+
+    /// 闩认的是「光标还停在刚补出的那一格里」：手动打出来的括号、或者已经走开
+    /// 的光标，都不该让 Tab 变成越界。
+    #[test]
+    fn tab_only_jumps_a_pair_it_inserted() {
+        let mut st = EditorState::new().expect("GDI");
+        let hwnd = HWND(std::ptr::null_mut());
+        // 自动配对关掉：括号是用户自己打的，没有「刚刚自动输入」。
+        st.auto_pair = false;
+        st.insert_char(hwnd, '(');
+        st.insert_char(hwnd, ')');
+        st.docs.act_mut().caret = (0, 1);
+        st.insert_tab(hwnd);
+        assert_eq!(st.docs.act_mut().doc.to_text(), "(\t)");
+    }
+
+    /// 开关关掉时，即便闩还在，Tab 也照旧插缩进。
+    #[test]
+    fn tab_jump_switch_off_inserts_the_tab() {
+        let mut st = EditorState::new().expect("GDI");
+        let hwnd = HWND(std::ptr::null_mut());
+        st.insert_char(hwnd, '(');
+        st.jump_with_tab = false;
+        st.insert_tab(hwnd);
+        assert_eq!(st.docs.act_mut().doc.to_text(), "(\t)");
+        assert_eq!(st.docs.act_mut().caret, (0, 2));
+    }
+
+    /// 「中文括号(必须配对输入)」补进来的成对字符和内置那组一样参与配对输入。
+    /// 写法是相邻两字为一对，落单的最后一个字不算。
+    #[test]
+    fn full_width_pair_extends_the_pair_set() {
+        let mut st = EditorState::new().expect("GDI");
+        let hwnd = HWND(std::ptr::null_mut());
+        st.full_width_pair = "《》〈〉".chars().collect();
+        st.insert_char(hwnd, '《');
+        assert_eq!(st.docs.act_mut().doc.to_text(), "《》");
+        assert_eq!(st.docs.act_mut().caret, (0, 1));
+        // 补上的闭括号照样跳过，不重复写。
+        st.insert_char(hwnd, '》');
+        assert_eq!(st.docs.act_mut().doc.to_text(), "《》");
+        assert_eq!(st.docs.act_mut().caret, (0, 2));
+        // 串尾落单的那个字凑不成一对，不进配对集合。
+        st.full_width_pair = "《》〉".chars().collect();
+        st.docs.act_mut().caret = (0, 2);
+        st.insert_char(hwnd, '〉');
+        assert_eq!(st.docs.act_mut().doc.to_text(), "《》〉");
     }
 
     #[test]
@@ -29855,6 +30272,18 @@ mod editmenu_tests {
         st.docs.act_mut().selection.clear();
         let model = super::statusbar::model_of(&st);
         assert_eq!(model.edit_mode, Some(dg_ui::statusbar::EditMode::Column));
+    }
+
+    /// 「光标列号从1开始计数」只挪状态栏那一格的读数：坐标本身还是 0 基，
+    /// 关掉（出厂值）时列 0 就是行首。
+    #[test]
+    fn col_one_shifts_the_column_pane_only() {
+        let (mut st, _) = state_with("abcd");
+        st.docs.act_mut().caret = (0, 2);
+        assert_eq!(super::statusbar::model_of(&st).col, Some(2));
+        st.col_one = true;
+        assert_eq!(super::statusbar::model_of(&st).col, Some(3));
+        assert_eq!(st.docs.act().caret, (0, 2), "光标坐标不跟着挪");
     }
 
     /// A chosen row is dispatched as a command: this is the whole path from
@@ -36551,6 +36980,43 @@ mod chord_behaviour_tests {
         st.run_command(h, Command::Caret(MoveDir::PageDown, true), 1);
         assert_eq!(st.docs.act().caret, (0, 9));
         assert_eq!(range_of(&st), ((0, 1), (0, 9)));
+    }
+
+    /// 「当光标距边界?行时进行滚动」（出厂 0）：只有翻页用它，翻完把光标停在
+    /// 离窗口边 `limit` 行的地方，而不是贴边。留边不小于一整屏时条件本来就不
+    /// 成立，等于没有留边。
+    #[test]
+    fn scroll_limit_keeps_context_on_page_moves() {
+        let rows: Vec<String> = (0..40).map(|i| format!("line {i}")).collect();
+        let refs: Vec<&str> = rows.iter().map(|s| s.as_str()).collect();
+        let mut st = fixture(&refs);
+        lay_out(&mut st, &[], false);
+        let h = hwnd();
+        let at_top = |st: &mut EditorState| {
+            st.docs.act_mut().caret = (0, 0);
+            st.docs.act_mut().first_row = 0;
+        };
+        // 出厂值：PageDown 把光标顶到底边，底下一行不留。
+        at_top(&mut st);
+        st.run_command(h, Command::Caret(MoveDir::PageDown, false), 10);
+        assert_eq!(st.docs.act().caret.0, 10);
+        assert_eq!(st.docs.act().first_row, 1);
+        // 留 3 行：底下空出 3 行。
+        st.docs.act_mut().set_scroll_limit(3);
+        at_top(&mut st);
+        st.run_command(h, Command::Caret(MoveDir::PageDown, false), 10);
+        assert_eq!(st.docs.act().first_row, 4);
+        // PageUp 同理，留的是上边。
+        st.docs.act_mut().caret = (20, 0);
+        st.docs.act_mut().first_row = 20;
+        st.run_command(h, Command::Caret(MoveDir::PageUp, false), 10);
+        assert_eq!(st.docs.act().caret.0, 10);
+        assert_eq!(st.docs.act().first_row, 7);
+        // 留边不小于一整屏 = 没有留边。
+        st.docs.act_mut().set_scroll_limit(16);
+        at_top(&mut st);
+        st.run_command(h, Command::Caret(MoveDir::PageDown, false), 10);
+        assert_eq!(st.docs.act().first_row, 1);
     }
 
     /// The bare Home/End rows run to the bounds of the visual row under the caret,

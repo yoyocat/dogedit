@@ -638,7 +638,7 @@ end)</code></pre>
 <tr><td class="nowrap"><code>ctx.part</code></td><td>字符串</td><td>部件名:状态格是段 id(<code>"encoding"</code>…),其它区域是区域名</td></tr>
 <tr><td class="nowrap"><code>ctx.text</code> / <code>ctx.label</code> / <code>ctx.value</code></td><td>字符串</td><td>宿主备好的三路文字(对应 <code>@text</code> / <code>@label</code> / <code>@value</code>)</td></tr>
 <tr><td class="nowrap"><code>ctx.dpi</code></td><td>整数</td><td>该区域解析到的 DPI</td></tr>
-<tr><td class="nowrap"><code>ctx.theme</code></td><td>表</td><td>当前主题调色板:<code>ctx.theme["status.bg"]</code> → <code>"#RRGGBB"</code>(89 个 token,见 14.4)。换主题时宿主整表重灌,同一张表引用跟着变</td></tr>
+<tr><td class="nowrap"><code>ctx.theme</code></td><td>表</td><td>当前主题调色板:<code>ctx.theme["status.bg"]</code> → <code>"#RRGGBB"</code>(90 个 token,见 14.4)。换主题时宿主整表重灌,同一张表引用跟着变</td></tr>
 <tr><td class="nowrap"><code>ctx.doc</code></td><td>表</td><td>文档只读快照:<code>encoding</code> / <code>bom</code> / <code>eol</code> / <code>syntax</code> / <code>lines</code> / <code>read_only</code> / <code>modified</code> / <code>large</code>。<b>比 meta() 少一个 bytes</b>(总字节数要整表扫描,绘制档不付这个钱;真要字节走意图档的 <code>App.doc.meta()</code>)。没有快照时读字段得 nil,不用先判空</td></tr>
 <tr><td class="nowrap"><code>ctx.hot</code> / <code>ctx.active</code> / <code>ctx.pressed</code> / <code>ctx.disabled</code> / <code>ctx.checked</code> / <code>ctx.focus</code> / <code>ctx.selected</code> / <code>ctx.modified</code> / <code>ctx.alt</code></td><td>布尔</td><td>这一格的 9 个状态位(悬停 / 选中页签 / 按下 / 禁用 / 勾选 / 焦点 / 选中 / 内容改过 / 交替行)</td></tr>
 <tr><td class="nowrap"><code>ctx.rows</code></td><td>数组</td><td><b>仅 editor.overlay / editor.gutter</b>:可见行表,见 11.5</td></tr>
@@ -829,17 +829,17 @@ ui.paint:unhint("tab")</code></pre>
 <li><b>字体 token 6 个</b>:<code>ui</code> / <code>mono</code> / <code>tab</code> / <code>status</code> / <code>menu</code> / <code>pane</code>;字段 <code>face</code>(字面名)/ <code>size</code>(数字 pt)/ <code>weight</code>(100..900 或 <code>"normal"</code>=400、<code>"bold"</code>=700)/ <code>italic</code>(布尔)。补丁是<b>按字段</b>盖在主题值上的:只改字号不动字面。越界的数字盖上去时夹取。</li>
 <li>改完是「下一次重画就对了」;复位也照样触发重画。<code>style:metrics()</code> / <code>shapes()</code> / <code>fonts()</code> 的输出<b>原样贴回主题文件</b>就变成永久的 —— 调试脚本就是主题文件的设计台。</li>
 </ul>
-<h3>14.4 只读主题 App.theme 与 89 个 token</h3>
+<h3>14.4 只读主题 App.theme 与 90 个 token</h3>
 <table>
 <tr><th>调用</th><th>说明</th></tr>
 <tr><td class="nowrap"><code>App.theme.name()</code></td><td>当前主题名(宿主合成主题时推给脚本)</td></tr>
 <tr><td class="nowrap"><code>App.theme.color(token)</code></td><td>一个 token 的生效值(含脚本覆盖)</td></tr>
-<tr><td class="nowrap"><code>App.theme.list()</code></td><td>全部 89 个 token 的生效值</td></tr>
+<tr><td class="nowrap"><code>App.theme.list()</code></td><td>全部 90 个 token 的生效值</td></tr>
 </table>
 <p>全部颜色 token(绘制回调里用 <code>ctx.theme["…"]</code> 读同一份):</p>
 <table>
 <tr><th>组</th><th>token</th></tr>
-<tr><td>编辑区</td><td class="nowrap" style="white-space:normal"><code>editor.bg</code> <code>editor.fg</code> <code>editor.caret</code> <code>editor.caret_glow</code> <code>editor.caret_indicator</code> <code>editor.selection</code> <code>editor.current_line</code> <code>editor.below</code> <code>editor.margin</code> <code>editor.indent_line</code> <code>editor.boundary</code> <code>editor.whitespace</code> <code>editor.ruler</code> <code>editor.minimap_viewport</code> <code>editor.line_modified</code> <code>editor.line_saved</code> <code>editor.bookmark</code> <code>editor.tag</code> <code>editor.pair</code> <code>editor.found_bg</code> <code>editor.found_fg</code> <code>editor.url_bg</code> <code>editor.url_fg</code> <code>editor.email_bg</code> <code>editor.email_fg</code> <code>editor.word2_bg</code> <code>editor.word2_fg</code> <code>editor.conchar_bg</code> <code>editor.conchar_fg</code></td></tr>
+<tr><td>编辑区</td><td class="nowrap" style="white-space:normal"><code>editor.bg</code> <code>editor.fg</code> <code>editor.caret</code> <code>editor.caret_glow</code> <code>editor.caret_indicator</code> <code>editor.selection</code> <code>editor.selection_fg</code> <code>editor.current_line</code> <code>editor.below</code> <code>editor.margin</code> <code>editor.indent_line</code> <code>editor.boundary</code> <code>editor.whitespace</code> <code>editor.ruler</code> <code>editor.minimap_viewport</code> <code>editor.line_modified</code> <code>editor.line_saved</code> <code>editor.bookmark</code> <code>editor.tag</code> <code>editor.pair</code> <code>editor.found_bg</code> <code>editor.found_fg</code> <code>editor.url_bg</code> <code>editor.url_fg</code> <code>editor.email_bg</code> <code>editor.email_fg</code> <code>editor.word2_bg</code> <code>editor.word2_fg</code> <code>editor.conchar_bg</code> <code>editor.conchar_fg</code></td></tr>
 <tr><td>gutter</td><td class="nowrap"><code>editor.gutter.bg</code> <code>editor.gutter.fg</code> <code>editor.gutter.folding_bg</code> <code>editor.gutter.folding_fg</code> <code>editor.gutter.icon_bg</code> <code>editor.gutter.icon_fg</code></td></tr>
 <tr><td>标记 0–7</td><td class="nowrap"><code>editor.marker0.bg</code> … <code>editor.marker7.bg</code> 与对应的 <code>editor.marker0.fg</code> … <code>editor.marker7.fg</code>(16 个)</td></tr>
 <tr><td>弹窗</td><td class="nowrap"><code>popup.bg</code> <code>popup.fg</code></td></tr>
@@ -962,7 +962,7 @@ scripts = ["paint.lua", "panels.lua"]  # 可省;缺省 = 目录下所有 *.lua �
 <tr><td><code>bad gesture …: want Ctrl/Shift/Alt + letter, digit, F1-F12, or one of Up/Down/Left/Right/Space/Enter/Esc/Tab/Backspace/Insert/Delete/Home/End/PageUp/PageDown</code></td><td>快捷键写法不合法</td></tr>
 <tr><td><code>too many timers (max 64)</code></td><td>定时器没 cancel 就一直登记;重载会清,循环里不会</td></tr>
 <tr><td><code>App.run: no command "…"</code></td><td>命令名写错,或该命令既不是脚本命令也不在内置表</td></tr>
-<tr><td><code>… 不是 token 名(共 89 个,形如 tab.mark / status.bg / scroll.thumb)</code></td><td>颜色 token 拼错,报错里给了写法样例</td></tr>
+<tr><td><code>… 不是 token 名(共 90 个,形如 tab.mark / status.bg / scroll.thumb)</code></td><td>颜色 token 拼错,报错里给了写法样例</td></tr>
 <tr><td><code>… 不是度量名 / 不是区域 / 不是形状键 / 不是字体 token</code></td><td>同类拼错;报错会列出全部合法名</td></tr>
 <tr><td><code>ui.layout:status 里 "x" 出现了两次…</code></td><td>段名重复 —— 段名同时是绘制区域名,重名会共用缓存</td></tr>
 <tr><td><code>ui.layout: 没有 pane.x 这个元素 —— 先声明它,再改它</code></td><td>update / remove 之前没 pane 过</td></tr>

@@ -62,6 +62,47 @@ fn word_wrap_breaks_at_last_space() {
 }
 
 #[test]
+fn break_rules_move_the_landing_point() {
+    // 10 px 等宽、限宽 100 px、按字符断：第 11 个字符（下标 10）溢出来，
+    // 断点本来落在下标 10 —— 也就是让那一格顶到下一行的行头。
+    let mut m = TableMeasurer {
+        ascii: [10; 128],
+        cjk_width: 20,
+        fallback: 10,
+        avg: 10,
+    };
+    let wrapper = WinEdgeWrapper {
+        width_px: 100,
+        word_wrap: false,
+    };
+    // 行头禁排：`,` 不许起行，断点退一格，逗号跟着上一行走。
+    let mut engine = WrapEngine::default();
+    engine.break_head = vec![','];
+    engine.wrap_line(0, "aaaaaaaaaa,bbb", &wrapper, &mut ctx(&mut m));
+    assert_eq!(engine.store.arrays[0].data, vec![9]);
+    // 行尾禁排：`(` 不许收尾，断点同样退一格，左括号跟着挪到下一行。
+    let mut engine = WrapEngine::default();
+    engine.break_tail = vec!['('];
+    engine.wrap_line(0, "aaaaaaaaa(bb", &wrapper, &mut ctx(&mut m));
+    assert_eq!(engine.store.arrays[0].data, vec![9]);
+    // 两串都空 = 老行为，断点就在溢出的那一格。
+    let mut engine = WrapEngine::default();
+    engine.wrap_line(0, "aaaaaaaaaa,bbb", &wrapper, &mut ctx(&mut m));
+    assert_eq!(engine.store.arrays[0].data, vec![10]);
+    // 退让不许排出一行空行：整段都是禁则字符时停在原地犯一次。
+    let mut engine = WrapEngine::default();
+    engine.break_head = vec![','];
+    engine.wrap_line(0, ",,,,,,,,,,,x", &wrapper, &mut ctx(&mut m));
+    assert!(
+        engine.store.arrays[0]
+            .data
+            .windows(2)
+            .all(|w| w[1] > w[0]),
+        "断点必须严格往前，否则排得出空行"
+    );
+}
+
+#[test]
 fn tab_snaps_to_tab_stop() {
     // tab_px = 80; after "a" (x=8) a tab snaps to 80, so the
     // next char starts at x=80. With a 100px limit the 'b' at

@@ -91,6 +91,10 @@ pub struct Theme {
     /// #FFA500 — which is what a theme with no `SelIndicator` key gets.
     pub sel_indicator: Color,
     pub selection_bg: Color,
+    /// `Selection` 的第二色。选区不保持语法高亮前景时，被选中的字就涂这一色；
+    /// 深色主题给的是近白（`#F3F5F6`），浅色主题给的是近黑（`#1A1F23`），
+    /// 两边都是为了让饱和的选区底色上仍有足够对比。
+    pub selection_fg: Color,
     pub current_line_bg: Color,
     pub gutter_fg: Color,
     pub gutter_bg: Color,
@@ -302,6 +306,7 @@ impl Default for Theme {
             caret_glow: Color::rgba(0xAE, 0xAF, 0xAD, 90),
             sel_indicator: STOCK_SEL_INDICATOR,
             selection_bg: Color::rgba(0x26, 0x4F, 0x78, 0x80),
+            selection_fg: Color::rgb(0xF3, 0xF5, 0xF6),
             current_line_bg: Color::rgba(0x2A, 0x2A, 0x2A, 0xFF),
             gutter_fg: Color::rgb(0x85, 0x85, 0x85),
             gutter_bg: Color::rgb(0x1E, 0x1E, 0x1E),
@@ -827,6 +832,12 @@ impl Theme {
             // the opaque theme color is
             // carried at half alpha
             self.selection_bg = Color::rgba(c.r, c.g, c.b, 0x80);
+        }
+        // 只取显式写出的第二色，不走 `fg()` 那条「没有 fg 就退回 bg」：
+        // `Selection=#296899` 这种单色写法要是也落到前景，被选中的字就涂在
+        // 自己那条底色带上，等于选区里的文字消失。
+        if let Some(c) = file.colors.get("Selection").and_then(|c| c.fg) {
+            self.selection_fg = c;
         }
         if let Some(c) = file.bg("LineNumber") {
             self.gutter_bg = c;

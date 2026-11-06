@@ -1123,6 +1123,24 @@ impl PaintPipeline {
             );
         }
 
+        // 选区文本的背景色扩展到窗口右侧 (`SelExtend`): 这一行整行都在选区里
+        // 时，行尾那片没有字的空白也铺上选区底色，带子顶到文本区右缘。
+        // 「整行都在」只有单段选区才谈得上 —— 多光标各自一段，任何一行都未必
+        // 被同一段盖满，所以多段时这一条不铺。选区的最后一行也不算：那一行只
+        // 覆盖到选区的结束列，往后是正文，不是选区。
+        if view.get(ViewFlags::SEL_EXTEND)
+            && sel.ranges.len() == 1
+            && fline >= sel.ranges[0].start.0
+            && fline < sel.ranges[0].end.0
+        {
+            let left = x_of(win_end - start);
+            let tail = Rect::new(left, row_y, (clip.x + clip.w - left).max(0.0), row_h)
+                .intersect(&clip);
+            if !tail.is_empty() {
+                draw.alpha_blend(tail, theme.selection_bg, 0.5);
+            }
+        }
+
         // 自定义标记: an opaque band over the selection, then the active-line band
         // composited over *it* at half strength. A marker on the caret row
         // measures as the average of the marker colour and `ActiveLine`, and
@@ -1175,17 +1193,44 @@ impl PaintPipeline {
         // use the theme's plain-text color, not a constant that
         // survives every theme switch
         let default_fg = theme.foreground.to_u32();
+        // 选区文本保持语法高亮的前景色 (`KeepSelFG`): 这一行不写就是关，关时被
+        // 选中的字不再用自己那一份语法色，整段换成主题的选区前景 —— 深色主题给
+        // 近白、浅色主题给近黑，为的都是饱和的选区底色上仍有足够对比。深色主题的
+        // 选区前景和默认前景差得很小，所以纯文字被选中几乎看不出换了色，挑一个语法
+        // 着色的词才看得出来；写 `Y` 才是开着，那时选区只剩底色。所以一次 emit 要
+        // 按「在不在选区里」拆成若干段分别发。
+        let keep_sel_fg = view.get(ViewFlags::KEEP_SEL_FG);
+        // 没有选区时逐列问「在不在选区里」是白问，直接整段发。
+        let split_sel_fg = !keep_sel_fg && !sel.is_empty();
         // The run walk still visits every run of the segment — it has to, to keep
         // the cursors honest — but only the part inside the window reaches the
         // draw list, so a 5 MB line costs one screenful of glyphs.
         let mut emit = |draw: &mut DrawList, from: usize, to: usize, color: Color, style: u8| {
             let from = from.max(win_start);
             let to = to.min(win_end);
-            if to > from {
+            if to <= from {
+                return;
+            }
+            if !split_sel_fg {
                 emit_text_run(
                     draw, &chars, win_start, content_y, row_h, from, to, color, style, &suppressed,
                     &special, &x_at, &mut mark,
                 );
+                return;
+            }
+            let mut i = from;
+            while i < to {
+                let inside = sel.contains(fline, i);
+                let mut j = i + 1;
+                while j < to && sel.contains(fline, j) == inside {
+                    j += 1;
+                }
+                let piece = if inside { theme.selection_fg } else { color };
+                emit_text_run(
+                    draw, &chars, win_start, content_y, row_h, i, j, piece, style, &suppressed,
+                    &special, &x_at, &mut mark,
+                );
+                i = j;
             }
         };
         while seg_char < end {
@@ -1746,7 +1791,175 @@ mod tests {
         draw
     }
 
-    /// 空白字符: a blank gets its dot only while the row is on, and the dot sits
+    /// 一行按给定的视图选项位绘制，文本区右缘钉在 `clip_w`。选区的两个绘制开关
+    /// 都读视图位，而带子要铺到「窗口右侧」就必须有个能量出右缘的裁剪矩形。
+    fn row_view(text: &str, sel: &SelectionSet, view: ViewFlags, clip_w: f32) -> DrawList {
+        let doc = Document::from_utf8(text.as_bytes());
+        let wrap = wrap_for(text);
+        let theme = Theme::default();
+        let clip = Rect::new(0.0, 0.0, clip_w, 1e6);
+        let mut draw = DrawList::default();
+        PaintPipeline::draw_line(
+            &doc,
+            0,
+            0,
+            &wrap,
+            None,
+            None,
+            &[],
+            &[],
+            &[],
+            &[],
+            sel,
+            &theme,
+            4,
+            view,
+            InvisibleChars::default(),
+            clip,
+            clip.w,
+            0.0,
+            0,
+            usize::MAX,
+            &[],
+            false,
+            None,
+            &Default::default(),
+            &mut draw,
+        );
+        draw
+    }
+
+    /// 选区里每一段字的颜色和它的起止。
+    fn coloured_runs(draw: &DrawList) -> Vec<(String, Color)> {
+        draw.cmds
+            .iter()
+            .filter_map(|c| match c {
+                DrawCmd::TextRun { text, color, .. } => Some((text.clone(), *color)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// 「选区文本保持语法高亮的前景色」关掉（出厂值，也就是 `setting.ini` 里没写
+    /// 这一行）时选区里的字换成主题的选区前景、选区外不变；打开时两边都用语法色，
+    /// 选区只剩底色。
+    #[test]
+    fn keep_sel_fg_switches_the_selected_text_colour() {
+        let mut theme = Theme::default();
+        let syntax = Color::rgb(0x00, 0x70, 0x70);
+        theme.selection_fg = Color::rgb(0xFF, 0xEE, 0x00);
+        let doc = Document::from_utf8(b"ab cd".as_slice());
+        let wrap = wrap_for("ab cd");
+        let mut sel = SelectionSet::default();
+        sel.add(Range {
+            start: (0, 3),
+            end: (0, 5),
+        });
+        let flag = |keep: bool| {
+            let mut v = ViewFlags::default();
+            v.set(ViewFlags::KEEP_SEL_FG, keep);
+            v
+        };
+        let runs = |view: ViewFlags| {
+            let clip = Rect::new(0.0, 0.0, 1e6, 1e6);
+            let mut draw = DrawList::default();
+            PaintPipeline::draw_line(
+                &doc,
+                0,
+                0,
+                &wrap,
+                Some(&[(syntax.to_u32(), 5, 0)]),
+                None,
+                &[],
+                &[],
+                &[],
+                &[],
+                &sel,
+                &theme,
+                4,
+                view,
+                InvisibleChars::default(),
+                clip,
+                clip.w,
+                0.0,
+                0,
+                usize::MAX,
+                &[],
+                false,
+                None,
+                &Default::default(),
+                &mut draw,
+            );
+            coloured_runs(&draw)
+        };
+        // 关掉：选区前的 `ab ` 保持语法色，选区里的 `cd` 换成选区前景。
+        let off = runs(flag(false));
+        assert_eq!(
+            off,
+            vec![
+                ("ab ".to_string(), syntax),
+                ("cd".to_string(), theme.selection_fg),
+            ],
+            "关掉时选区里的字要换成选区前景"
+        );
+        // 打开：整行一种颜色，选区只剩底色。
+        let on = runs(flag(true));
+        assert_eq!(on, vec![("ab cd".to_string(), syntax)]);
+        // 出厂的那张位图没写这一位，所以落回关掉那一种画法。
+        assert_eq!(runs(ViewFlags::shipped_defaults()), off);
+    }
+
+    /// 「选区文本的背景色扩展到窗口右侧」：整行被同一段选区盖住时，行尾的空白
+    /// 也铺上选区底色，一直顶到文本区右缘。选区的最后一行不铺 —— 那行只覆盖到
+    /// 选区的结束列。
+    #[test]
+    fn sel_extend_lays_the_selection_band_to_the_window_edge() {
+        let theme = Theme::default();
+        let clip_w = 400.0;
+        let mut sel = SelectionSet::default();
+        sel.add(Range {
+            start: (0, 0),
+            end: (2, 2),
+        });
+        let band_right = |extend: bool| {
+            let mut view = ViewFlags::default();
+            view.set(ViewFlags::SEL_EXTEND, extend);
+            let draw = row_view("abc", &sel, view, clip_w);
+            draw.cmds
+                .iter()
+                .filter_map(|c| match c {
+                    DrawCmd::AlphaBlend { rect, color, .. } if *color == theme.selection_bg => {
+                        Some(rect.x + rect.w)
+                    }
+                    _ => None,
+                })
+                .max_by(|a, b| a.total_cmp(b))
+                .unwrap_or_default()
+        };
+        // 关掉（出厂值）：带子只到第三个字。
+        let off = band_right(false);
+        assert!(off < clip_w, "关掉时不该铺到右缘，实测 {off}");
+        // 打开：这一行不是选区的最后一行，带子顶到右缘。
+        assert_eq!(band_right(true), clip_w);
+        // 换成选区的最后一行，两种姿态都不该多出右缘那一段。
+        let mut last = SelectionSet::default();
+        last.add(Range {
+            start: (0, 0),
+            end: (0, 3),
+        });
+        let mut view = ViewFlags::default();
+        view.set(ViewFlags::SEL_EXTEND, true);
+        let draw = row_view("abc", &last, view, clip_w);
+        assert!(
+            !draw.cmds.iter().any(|c| matches!(
+                c,
+                DrawCmd::AlphaBlend { rect, color, .. }
+                    if *color == theme.selection_bg && rect.x + rect.w >= clip_w
+            )),
+            "选区的最后一行不该扩展到右缘"
+        );
+    }
+
     /// in the cell's centre — 2×2 at the shipped style, on the font's cell and
     /// not on the row pitch.
     #[test]

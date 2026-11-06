@@ -1272,7 +1272,8 @@ fn syntax_label(reg: &dg_syntax::LanguageRegistry, lang: &str) -> Option<String>
 }
 
 /// The editor state as the strip reads it. The line is 1-based and the column
-/// 0-based, which is how the 行 and 列 panes print them. The selection pane is
+/// 0-based — 「光标列号从1开始计数」把那格往上挪 1 —— which is how the 行 and 列
+/// panes print them. The selection pane is
 /// computed the way the selection updater does: the inclusive character span
 /// and the number of lines it touches.
 ///
@@ -1314,6 +1315,9 @@ pub(super) fn strip_of(
         lines: sel_lines,
     });
     let line_count = editor.doc.line_count();
+    // 「光标列号从1开始计数」只改这一格的读数：内部坐标始终是 0 基，命中测试、
+    // 跳转、选区跨度都不跟着挪。
+    let shown_col = col + usize::from(st.col_one);
     let encoding = match editor.doc.codepage() {
         Some(cp) => {
             let plus = if editor.doc.has_bom() { "+" } else { "" };
@@ -1337,7 +1341,7 @@ pub(super) fn strip_of(
     let model = StatusModel {
         message: st.notify.clone(),
         line: Some(line + 1),
-        col: Some(col),
+        col: Some(shown_col),
         char_value,
         line_count: Some(line_count),
         encoding: Some(encoding.clone()),
@@ -1397,7 +1401,7 @@ pub(super) fn strip_of(
     };
     let facts = dg_skin::statusline::Facts {
         line: line + 1,
-        col,
+        col: shown_col,
         lines: line_count,
         pct,
         name,
