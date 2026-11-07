@@ -29,10 +29,12 @@
 
 部署完成后地址是 `https://dogedit-parsers.<你的账号子域>.workers.dev`。
 把这个地址填进主程序（`setting.ini` 的 `[Download] Registry`，或改
-`download.rs` 里的默认常量随包发布）。自定义域可在 Cloudflare 控制台
-给 Worker 绑定，客户端无感。
+`download.rs` 里的默认常量随包发布）。正式地址用 wrangler.toml 里的
+`routes`（`custom_domain = true`）绑自定义域 —— workers.dev 域名在
+部分地区不可达；保留 `workers_dev = true` 让旧地址继续作 fallback。
 
-当前线上：`https://dogedit-parsers.xqtxyz.workers.dev`（2026-10-31 首发，
+当前线上：自定义域 `https://parsers.djjj.org`（主）与
+`https://dogedit-parsers.xqtxyz.workers.dev`（备用；2026-10-31 首发，
 62 个包 / 118 个扩展名，与主程序 `DEFAULT_SOURCE` 一致）。重新生成注册表
 后重跑一次 `npx wrangler deploy` 即可，未变的包按内容哈希跳过上传。
 

@@ -4,6 +4,14 @@ name = "dogedit-parsers"
 main = "src/worker.js"
 compatibility_date = "2026-01-15"
 
+# 自定义域（workers.dev 在部分地区不可达）：wrangler 会自动建 DNS 记录
+# 并签发证书；该子域在 DNS 里已有记录时要先删掉再部署。
+routes = [
+  { pattern = "parsers.djjj.org", custom_domain = true }
+]
+# 旧地址继续保留作 fallback（加了自定义域后 wrangler 默认会关掉它）。
+workers_dev = true
+
 [assets]
 directory = "./public"
 binding = "ASSETS"

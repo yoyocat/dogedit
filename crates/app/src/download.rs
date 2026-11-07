@@ -28,9 +28,10 @@ use dg_syntax::install::{install_package, manifest_from_zip};
 use dg_syntax::{RegistryDoc, RemotePackage};
 use serde::{Deserialize, Serialize};
 
-/// 默认注册表基址（`deploy/parser-registry` 的线上地址）；
-/// `[Download] Registry` 设置随时覆盖（也接受本地镜像目录路径）。
-pub const DEFAULT_SOURCE: &str = "https://dogedit-parsers.xqtxyz.workers.dev";
+/// 默认注册表基址（`deploy/parser-registry` 的线上地址，自定义域作主源、
+/// workers.dev 作备用）；`[Download] Registry` 设置随时覆盖（也接受本地
+/// 镜像目录路径）。
+pub const DEFAULT_SOURCE: &str = "https://parsers.djjj.org";
 
 /// 用户解析器的唯一可写落点，与 `scan_syntax_plugins` 的第三个根一致。
 pub fn user_parsers_root() -> Option<PathBuf> {
