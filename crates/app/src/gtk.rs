@@ -5,7 +5,7 @@
 //! runs the `PaintPipeline`. Platform wiring
 //! is pending the M7 milestone.
 
-pub fn run(_path: Option<&str>) -> i32 {
+pub fn run(_launch: &crate::launch::Launch) -> i32 {
     eprintln!("gtk backend: milestone M7 (not implemented)");
     1
 }

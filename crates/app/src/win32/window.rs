@@ -249,7 +249,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     SWP_NOOWNERZORDER, SWP_NOSIZE, SWP_NOZORDER, SWP_SHOWWINDOW, SetCursor, SetLayeredWindowAttributes,
     SetMenu, SetTimer, SetWindowLongPtrW, SetWindowPos,
     ShowWindow, TranslateMessage, WINDOW_EX_STYLE, WINDOW_LONG_PTR_INDEX, WINDOW_STYLE, WM_APP,
-    WM_CAPTURECHANGED, WM_ACTIVATE, WM_CHANGECBCHAIN, WM_CHAR, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_CTLCOLOREDIT, WM_DESTROY,
+    WM_CAPTURECHANGED, WM_ACTIVATE, WM_CHANGECBCHAIN, WM_CHAR, WM_CLOSE, WM_COMMAND, WM_COPYDATA, WM_CREATE, WM_CTLCOLOREDIT, WM_DESTROY,
     WM_DPICHANGED, WM_DRAWCLIPBOARD, WM_DRAWITEM, WM_INITMENUPOPUP, WM_KEYDOWN, WM_KEYUP,
     WM_KILLFOCUS, WM_LBUTTONDBLCLK, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP,
     WM_MEASUREITEM, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_MOVE, WM_NCACTIVATE, WM_NCDESTROY, WM_NCPAINT,
@@ -274,7 +274,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use windows::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
 use windows::core::{PCWSTR, PWSTR, w};
 
-const CLASS_NAME: PCWSTR = w!("dogedit_main_window");
+pub(super) const CLASS_NAME: PCWSTR = w!("dogedit_main_window");
 /// The icon group the build script embeds, under resource id 1.
 const ICON_RESOURCE: PCWSTR = PCWSTR(1 as *const u16);
 
@@ -1730,8 +1730,8 @@ pub(super) struct EditorState {
     session_active_id: Option<u64>,
     /// 会话恢复：这一轮还剩几个标签要开（0 = 没在恢复）。队列走完报一次数。
     session_restore_total: usize,
-    /// 命令行带来的文件：等会话恢复完再开，它才是最后落在屏幕上的那个。
-    session_open_after: Option<String>,
+    /// 命令行 / `WM_COPYDATA` 带来的文件：等会话恢复完再开，按到达顺序。
+    session_open_after: Vec<String>,
     /// Transient status message
     /// (watcher events, search
     /// completion). The status strip's
@@ -5037,12 +5037,23 @@ impl EditorState {
         }
     }
 
+    /// 单实例模式下，另一个进程把它的启动请求用 `WM_COPYDATA` 交过来了。
+    /// 文件走和命令行一样的开路（会话恢复没完就排队），`-g` 直接把
+    /// 「在文件中查找和替换」开在指定的文件夹上。
+    fn accept_handoff(&mut self, hwnd: HWND, launch: &crate::launch::Launch) {
+        self.queue_or_open_files(&launch.files);
+        if let Some(dir) = &launch.grep_dir {
+            self.find_in_files(hwnd, Some(dir));
+        }
+    }
+
     /// Opens the full 在文件中查找和替换 dialog (cm_find_infiles).
     ///
     /// The selection prefill takes a single line under 512
     /// characters as the find text; the dialog itself takes the document's
-    /// path for its folder prefill.
-    fn find_in_files(&mut self, hwnd: HWND) {
+    /// path for its folder prefill. `folder` (the `-g` command line / the
+    /// directory's right-mouse-button entry) overrides that prefill.
+    fn find_in_files(&mut self, hwnd: HWND, folder: Option<&str>) {
         if self.rename_active {
             self.rename_cancel();
         }
@@ -5063,6 +5074,7 @@ impl EditorState {
             frame: hwnd,
             selection,
             doc_path,
+            folder: folder.unwrap_or_default().to_string(),
             theme: &self.docs.act().theme,
         });
     }
@@ -6206,7 +6218,7 @@ impl EditorState {
             session_active: None,
             session_active_id: None,
             session_restore_total: 0,
-            session_open_after: None,
+            session_open_after: Vec::new(),
             notify: None,
             edit_mode: EditMode::Insert,
             dir_edit_base: String::new(),
@@ -9682,6 +9694,10 @@ impl EditorState {
         let started = match std::env::current_exe() {
             Ok(exe) => {
                 let mut cmd = std::process::Command::new(exe);
+                // 单实例模式开着时少了这一句，新进程会把「再开一个窗口」的
+                // 请求转发回旧窗口，然后自己退出 —— 用户点了新建实例却什么
+                // 也没发生。
+                cmd.arg("--new-instance");
                 if crate::safety::on() {
                     cmd.arg("--safe-mode");
                 }
@@ -9710,7 +9726,14 @@ impl EditorState {
         let Ok(exe) = std::env::current_exe() else {
             return;
         };
-        if std::process::Command::new(exe).arg(&path).spawn().is_ok() {
+        // `--new-instance` 是必须的：不带它，单实例模式会把这份文件转发回
+        // 当前窗口，命令就变成了「关掉这个标签」而不是分离出去。
+        let mut cmd = std::process::Command::new(exe);
+        cmd.arg("--new-instance");
+        if crate::safety::on() {
+            cmd.arg("--safe-mode");
+        }
+        if cmd.arg(&path).spawn().is_ok() {
             self.close_doc(index, hwnd);
         }
     }
@@ -15851,7 +15874,7 @@ impl EditorState {
                 true
             }
             Command::FindInFiles => {
-                self.find_in_files(hwnd);
+                self.find_in_files(hwnd, None);
                 true
             }
             // 大文件模式（本实现扩展 36000+）：非大文档静默忽略 —— 命令
@@ -23891,15 +23914,23 @@ fn relaunch_self() {
     let Ok(exe) = std::env::current_exe() else {
         return;
     };
+    // 重启发生在 `WM_DESTROY`：旧窗口还在走销毁流程，不加 `--new-instance`
+    // 的话新进程可能把请求又交回这个正在退出的窗口，起不来。
     let _ = std::process::Command::new(exe)
+        .arg("--new-instance")
         .args(std::env::args_os().skip(1))
         .spawn();
 }
 
 /// Entry point: register the window class,
-/// create the window, optionally load `path`,
+/// create the window, optionally load the files `launch` names,
 /// run the message loop.
-pub fn run(path: Option<&str>) -> i32 {
+pub fn run(launch: &crate::launch::Launch) -> i32 {
+    // 常规页的「允许多个实例同时运行」关着时，这一趟只是把文件交给已经开着的
+    // 窗口。放在读配置、建窗口之前：多出来的这一份进程不该动任何状态。
+    if unsafe { crate::win32::single_instance::try_handoff(launch) } {
+        return 0;
+    }
     unsafe {
         // The language table is read before any window exists: the menu bar,
         // the dialogs and the status strip all ask it for their words, and the
@@ -24001,6 +24032,9 @@ pub fn run(path: Option<&str>) -> i32 {
                 return 1;
             }
         };
+        // 别的进程凭这个属性认出「这是同一份 exe 的窗口」，从资源管理器再点
+        // 一个文件时才知道该交给谁。
+        crate::win32::single_instance::mark_window(hwnd);
         chrome::title_bar(hwnd, dark_chrome);
         // The window is created visible, so the frame has already been drawn
         // once in the old palette; `SWP_FRAMECHANGED` is what makes DWM pick up
@@ -24065,14 +24099,18 @@ pub fn run(path: Option<&str>) -> i32 {
         }
 
         // 会话恢复：上次没关的标签页 + 热保存的脏文档，一份一份开；命令行
-        // 带来的文件排在最后，它才是用户此刻要看的那个。
+        // 带来的文件排在最后，它们才是用户此刻要看的那些。`-g` 则直接把
+        // 「在文件中查找和替换」开在那个文件夹上。
         {
             let st = &mut *(state_ptr as *mut EditorState);
-            // The command-line file goes through the same open path as the
+            // The command-line files go through the same open path as the
             // dialogs: a `[HEX] Ext` file must land in the hex view, and a
             // text file takes over the blank tab exactly like this block
             // used to do by hand.
-            st.session_restore_start(hwnd, path);
+            st.session_restore_start(hwnd, &launch.files);
+            if let Some(dir) = &launch.grep_dir {
+                st.find_in_files(hwnd, Some(dir));
+            }
         }
 
         // Popup windows are created by USER32 inside `TrackPopupMenu`, so the
@@ -27174,6 +27212,19 @@ unsafe extern "system" fn window_proc(
                 }
             }
             LRESULT(0)
+        }
+        WM_COPYDATA => {
+            // 「允许多个实例同时运行」关着时，第二次启动不建窗，把文件与 `-g`
+            // 编成一份请求送过来。非零返回值是收条：发送方只有收到它才退出，
+            // 否则会自己再开一个窗，免得文件丢在半路上。
+            let Some(launch) = (unsafe { crate::win32::single_instance::decode(lparam) }) else {
+                return LRESULT(0);
+            };
+            let Some(st) = state_mut(hwnd) else {
+                return LRESULT(0);
+            };
+            st.accept_handoff(hwnd, &launch);
+            LRESULT(1)
         }
         grepdlg::WM_GREP => {
             // The 在文件中查找和替换 dialog asking for a search or a replace.

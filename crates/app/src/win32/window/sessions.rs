@@ -529,9 +529,28 @@ impl EditorState {
                     .unwrap_or_else(|| format!("已恢复上次的 {restored} 个标签页")),
             );
         }
-        // 命令行带来的文件最后开：它才是用户此刻要看的那个。
-        if let Some(path) = self.session_open_after.take() {
+        // 命令行带来的文件最后开：它们才是用户此刻要看的那些。资源管理器
+        // 一次选中多个文件时会给出好几个，顺序按命令行上的次序。
+        for path in std::mem::take(&mut self.session_open_after) {
             self.open_file(&path);
+        }
+    }
+
+    /// 把一批文件排到「会话恢复完之后」；没在恢复就立刻开。
+    ///
+    /// 启动时的 `-g`/命令行文件和别的进程用 `WM_COPYDATA` 交过来的文件走
+    /// 同一条路。恢复是渐进的（一次只装一份，热保存那份还要等载入完成），
+    /// 这时候直接 `open_file` 会和队列抢同一批状态，所以统一排队。
+    pub(super) fn queue_or_open_files(&mut self, files: &[String]) {
+        if files.is_empty() {
+            return;
+        }
+        let restoring = !self.session_queue.is_empty() || self.restore_pending.is_some();
+        self.session_open_after.extend(files.iter().cloned());
+        if !restoring {
+            for path in std::mem::take(&mut self.session_open_after) {
+                self.open_file(&path);
+            }
         }
     }
 
@@ -687,10 +706,11 @@ impl EditorState {
     }
 
     /// 启动时的会话恢复：把上次的标签页清单排进队列，一份一份开。
-    pub(super) fn session_restore_start(&mut self, hwnd: HWND, command_line: Option<&str>) {
+    /// `command_line` 是这次启动带来的全部文件，按命令行顺序，恢复完再开。
+    pub(super) fn session_restore_start(&mut self, hwnd: HWND, command_line: &[String]) {
         let settings = self.session.settings.clone();
         if !settings.files && !settings.hot {
-            if let Some(path) = command_line {
+            for path in command_line {
                 self.open_file(path);
             }
             return;
@@ -719,7 +739,7 @@ impl EditorState {
             crate::win32::session::OpenItem::File { path, .. } => ActiveTab::File(path.clone()),
             crate::win32::session::OpenItem::Hot { key } => ActiveTab::Hot(key.clone()),
         });
-        self.session_open_after = command_line.map(|s| s.to_string());
+        self.session_open_after = command_line.to_vec();
         if queue.is_empty() {
             // 清单是空的（第一次启动 / 选项刚打开）：只开命令行文件。
             self.session_restore_done(hwnd);

@@ -31,8 +31,8 @@ use windows::Win32::Graphics::Gdi::{
 };
 use windows::Win32::System::Com::CoTaskMemFree;
 use windows::Win32::System::Registry::{
-    RegCloseKey, RegCreateKeyW, RegDeleteKeyW, RegOpenKeyExW, RegSetValueW, HKEY,
-    HKEY_CURRENT_USER, KEY_READ, REG_SZ,
+    RegCloseKey, RegCreateKeyW, RegDeleteKeyW, RegOpenKeyExW, RegQueryValueExW, RegSetValueExW,
+    HKEY, HKEY_CURRENT_USER, KEY_ALL_ACCESS, KEY_READ, REG_SZ,
 };
 use windows::Win32::UI::Controls::Dialogs::{
     ChooseColorW, GetOpenFileNameW, CC_FULLOPEN, CC_RGBINIT, CHOOSECOLORW, OFN_FILEMUSTEXIST,
@@ -62,7 +62,8 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::Shell::{
     DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass, BIF_RETURNONLYFSDIRS, BROWSEINFOW,
-    SHBrowseForFolderW, SHGetPathFromIDListW, ShellExecuteW,
+    SHBrowseForFolderW, SHChangeNotify, SHCNE_ASSOCCHANGED, SHCNF_IDLIST,
+    SHGetPathFromIDListW, ShellExecuteW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreateDialogIndirectParamW, CreatePopupMenu, CreateWindowExW, DestroyMenu,
@@ -646,6 +647,84 @@ fn shell_registered(directory: bool) -> bool {
             false
         }
     }
+}
+
+/// 菜单项里要写的命令。目录那条靠 `-g` 把「在文件中查找」开在 `%1` 上，
+/// 文件那条就是普通的一次打开；两者都走单实例转交，不必另加参数。
+fn shell_command_line(exe: &str, directory: bool) -> String {
+    if directory {
+        format!("\"{exe}\" -g \"%1\"")
+    } else {
+        format!("\"{exe}\" \"%1\"")
+    }
+}
+
+/// 存下来的命令是不是还指着这份 exe（引号包住，避免 `C:\Program` 这类
+/// 前缀把路径截断成假匹配）。
+fn command_points_at(command: &str, exe: &str) -> bool {
+    command.starts_with(&format!("\"{exe}\""))
+}
+
+/// 菜单项里记下的命令（键的默认值）。挪过 exe 之后这里会指向旧路径，
+/// 这时即使勾还是勾着，也得把命令重写一遍。
+fn shell_command(directory: bool) -> Option<String> {
+    let path: Vec<u16> = if directory {
+        "SOFTWARE\\Classes\\Directory\\shell\\DogEdit\\command\0"
+            .encode_utf16()
+            .collect()
+    } else {
+        "SOFTWARE\\Classes\\*\\Shell\\DogEdit\\Command\0"
+            .encode_utf16()
+            .collect()
+    };
+    unsafe {
+        let mut h = HKEY::default();
+        if RegOpenKeyExW(
+            HKEY_CURRENT_USER,
+            PCWSTR(path.as_ptr()),
+            None,
+            KEY_READ,
+            &mut h,
+        ) != ERROR_SUCCESS
+        {
+            return None;
+        }
+        let mut buf = [0u16; 1024];
+        let mut size = (buf.len() * 2) as u32;
+        let rc = RegQueryValueExW(
+            h,
+            PCWSTR::null(),
+            None,
+            None,
+            Some(buf.as_mut_ptr() as *mut u8),
+            Some(&mut size),
+        );
+        let _ = RegCloseKey(h);
+        if rc != ERROR_SUCCESS {
+            return None;
+        }
+        let chars = (size as usize / 2).min(buf.len());
+        let end = buf[..chars].iter().position(|&c| c == 0).unwrap_or(chars);
+        Some(String::from_utf16_lossy(&buf[..end]))
+    }
+}
+
+/// 这一行要不要写注册表。除了「勾变了」，还认「程序搬家了」：右键菜单
+/// 存的是绝对路径，绿色版解压到别处后，旧命令点开会什么也不发生。
+fn shell_needs_write(directory: bool, wanted: bool, old: bool) -> bool {
+    if wanted != old {
+        return true;
+    }
+    // 安全模式里别因为「exe 搬家」就自作主张写注册表；用户没动这一行
+    // 就什么都别做。
+    if !wanted || crate::safety::on() {
+        return false;
+    }
+    let Ok(exe) = std::env::current_exe() else {
+        return false;
+    };
+    let exe = exe.display().to_string();
+    !shell_command(directory).is_some_and(|c| command_points_at(&c, &exe))
 }
 
 /// The ini file plus the values read from it, read once when the dialog opens.
@@ -1694,11 +1773,25 @@ impl Shell {
                 let _ = PostMessageW(Some(self.frame), WM_SETTINGS_APPLIED, WPARAM(0), LPARAM(0));
             }
         }
-        if next.shell_app != old.shell_app {
-            write_shell_entry(false, next.shell_app);
-        }
-        if next.shell_find != old.shell_find {
-            write_shell_entry(true, next.shell_find);
+        // 右键菜单两行写的是注册表：失败要说出来，勾选也得弹回去。否则
+        // 选项页显示「已添加」、资源管理器里却没有，下次打开还是这个假状态。
+        // exe 换了目录也重写一遍（旧命令指向的是搬走前的路径）。
+        for (directory, row_id, wanted, was) in [
+            (false, ID_ROW_SHELL, next.shell_app, old.shell_app),
+            (true, ID_ROW_SHELL_FIND, next.shell_find, old.shell_find),
+        ] {
+            if !shell_needs_write(directory, wanted, was) {
+                continue;
+            }
+            if let Err(why) = write_shell_entry(directory, wanted) {
+                if row_id == ID_ROW_SHELL {
+                    next.shell_app = was;
+                } else {
+                    next.shell_find = was;
+                }
+                restore_shell_row(self, row_id, was);
+                report_shell_failure(self.hwnd, &why);
+            }
         }
         self.settings = next.clone();
         self.applied = Some(next);
@@ -5951,88 +6044,156 @@ pub(super) fn show(frame: HWND, theme: &Theme) -> Option<Settings> {
 // Registry — the two right-mouse-button rows
 // ---------------------------------------------------------------------------
 
-/// Enable/disable `HKCU\SOFTWARE\Classes\*\Shell\DogEdit` (or the Directory
-/// entry)
-/// `"<exe>" "%1"` and `"<exe>" -g "%1"`.
-unsafe fn write_shell_entry(directory: bool, enable: bool) {
-    if !enable {
-        // it never touches the container itself.
-        let (parent, command) = if directory {
-            (
-                "SOFTWARE\\Classes\\Directory\\shell\0",
-                "DogEdit\\Command\0",
-            )
-        } else {
-            ("SOFTWARE\\Classes\\*\\Shell\0", "DogEdit\\Command\0")
-        };
-        let parent: Vec<u16> = parent.encode_utf16().collect();
-        let command: Vec<u16> = command.encode_utf16().collect();
-        let dogedit: Vec<u16> = "DogEdit\0".encode_utf16().collect();
-        let mut h = HKEY::default();
-        if RegOpenKeyExW(
-            HKEY_CURRENT_USER,
-            PCWSTR(parent.as_ptr()),
-            None,
-            windows::Win32::System::Registry::KEY_ALL_ACCESS,
-            &mut h,
-        ) == ERROR_SUCCESS
-        {
-            let _ = RegDeleteKeyW(h, PCWSTR(command.as_ptr()));
-            let _ = RegDeleteKeyW(h, PCWSTR(dogedit.as_ptr()));
-            let _ = RegCloseKey(h);
-        }
-        return;
-    }
-    let Ok(exe) = std::env::current_exe() else {
-        return;
-    };
-    let exe = exe.display().to_string();
-    let command = if directory {
-        format!("\"{exe}\" -g \"%1\"")
+/// 一个 REG_SZ 值。`name` 为空 = 键的默认值。
+unsafe fn set_reg_sz(key: HKEY, name: &str, value: &str) -> Result<(), String> {
+    let name_w: Vec<u16> = name.encode_utf16().chain([0]).collect();
+    let value_w: Vec<u16> = value.encode_utf16().chain([0]).collect();
+    let bytes = std::slice::from_raw_parts(value_w.as_ptr() as *const u8, value_w.len() * 2);
+    let rc = RegSetValueExW(key, PCWSTR(name_w.as_ptr()), None, REG_SZ, Some(bytes));
+    if rc == ERROR_SUCCESS {
+        Ok(())
     } else {
-        format!("\"{exe}\" \"%1\"")
+        Err(format!("注册表写入失败（错误码 {}）。", rc.0))
+    }
+}
+
+/// 建/开一个 HKCU 下的键，交给调用方关掉。
+unsafe fn create_shell_key(path: &str) -> Result<HKEY, String> {
+    let wide: Vec<u16> = path.encode_utf16().chain([0]).collect();
+    let mut h = HKEY::default();
+    let rc = RegCreateKeyW(HKEY_CURRENT_USER, PCWSTR(wide.as_ptr()), &mut h);
+    if rc == ERROR_SUCCESS {
+        Ok(h)
+    } else {
+        Err(format!("注册表写入失败（错误码 {}）。", rc.0))
+    }
+}
+
+/// 关联改了要告诉资源管理器，否则用户勾完立刻右键，看到的还是旧菜单
+/// （要么重开资源管理器，要么等它自己刷新）。
+unsafe fn notify_shell() {
+    SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, None, None);
+}
+
+unsafe fn delete_shell_entry(directory: bool) -> Result<(), String> {
+    let parent = if directory {
+        "SOFTWARE\\Classes\\Directory\\shell"
+    } else {
+        "SOFTWARE\\Classes\\*\\Shell"
     };
-    let label = if directory {
+    let parent_w: Vec<u16> = parent.encode_utf16().chain([0]).collect();
+    // 注册表键名不分大小写，两条分支用同一组相对路径就行。先删自己的
+    // `Command` 子键，再删 `DogEdit` —— 容器（* 或 Directory）留着不动。
+    let command: Vec<u16> = "Command".encode_utf16().chain([0]).collect();
+    let dogedit: Vec<u16> = "DogEdit".encode_utf16().chain([0]).collect();
+    let mut h = HKEY::default();
+    if RegOpenKeyExW(
+        HKEY_CURRENT_USER,
+        PCWSTR(parent_w.as_ptr()),
+        None,
+        KEY_ALL_ACCESS,
+        &mut h,
+    ) == ERROR_SUCCESS
+    {
+        let mut dog = HKEY::default();
+        if RegOpenKeyExW(h, PCWSTR(dogedit.as_ptr()), None, KEY_ALL_ACCESS, &mut dog)
+            == ERROR_SUCCESS
+        {
+            let _ = RegDeleteKeyW(dog, PCWSTR(command.as_ptr()));
+            let _ = RegCloseKey(dog);
+        }
+        let _ = RegDeleteKeyW(h, PCWSTR(dogedit.as_ptr()));
+        let _ = RegCloseKey(h);
+    }
+    if shell_registered(directory) {
+        return Err("右键菜单项没能删除，请检查注册表权限。".to_string());
+    }
+    Ok(())
+}
+
+/// 开启/关闭 `HKCU\SOFTWARE\Classes\*\Shell\DogEdit` 或 Directory 那一条。
+///
+/// 命令是 `"<exe>" "%1"` / `"<exe>" -g "%1"`；菜单文字走语言表的 15141 /
+/// 15140，英文界面不再硬写中文。顺手写 `icon` 让菜单项带程序图标，写完
+/// `SHChangeNotify` 刷新资源管理器。`Err` 带着给用户看的原因，调用方据此
+/// 把勾选弹回去。
+unsafe fn write_shell_entry(directory: bool, enable: bool) -> Result<(), String> {
+    // 安全模式的约定是不写任何东西，注册表尤其不能碰。
+    if crate::safety::on() {
+        return Err("安全模式不修改注册表；正常启动 DogEdit 后再设置右键菜单。".to_string());
+    }
+    if !enable {
+        delete_shell_entry(directory)?;
+        notify_shell();
+        return Ok(());
+    }
+    let exe = std::env::current_exe()
+        .map_err(|_| "取不到程序路径，无法写右键菜单。".to_string())?;
+    let exe = exe.display().to_string();
+    let command = shell_command_line(&exe, directory);
+    // 15141 = 用DogEdit打开，15140 = 用DogEdit在文件中查找。
+    let label_id = if directory { 15140 } else { 15141 };
+    let fallback = if directory {
         "用 DogEdit 在文件中查找"
     } else {
         "用 DogEdit 打开"
     };
+    let label = crate::win32::lang::string(label_id).unwrap_or(fallback);
+    let icon = format!("\"{exe}\",0");
     let (command_key, entry_key) = if directory {
         (
-            "SOFTWARE\\Classes\\Directory\\shell\\DogEdit\\command\0",
-            "SOFTWARE\\Classes\\Directory\\shell\\DogEdit\0",
+            "SOFTWARE\\Classes\\Directory\\shell\\DogEdit\\command",
+            "SOFTWARE\\Classes\\Directory\\shell\\DogEdit",
         )
     } else {
         (
-            "SOFTWARE\\Classes\\*\\Shell\\DogEdit\\Command\0",
-            "SOFTWARE\\Classes\\*\\Shell\\DogEdit\0",
+            "SOFTWARE\\Classes\\*\\Shell\\DogEdit\\Command",
+            "SOFTWARE\\Classes\\*\\Shell\\DogEdit",
         )
     };
-    let command_key: Vec<u16> = command_key.encode_utf16().collect();
-    let entry_key: Vec<u16> = entry_key.encode_utf16().collect();
-    let command_w: Vec<u16> = command.encode_utf16().chain([0]).collect();
-    let label_w: Vec<u16> = label.encode_utf16().chain([0]).collect();
-    let mut h = HKEY::default();
-    if RegCreateKeyW(HKEY_CURRENT_USER, PCWSTR(command_key.as_ptr()), &mut h) == ERROR_SUCCESS {
-        let _ = RegSetValueW(
-            h,
-            PCWSTR::null(),
-            REG_SZ,
-            PCWSTR(command_w.as_ptr()),
-            (command_w.len() * 2) as u32,
-        );
-        let _ = RegCloseKey(h);
+
+    let h = create_shell_key(command_key)?;
+    let result = set_reg_sz(h, "", &command);
+    let _ = RegCloseKey(h);
+    result?;
+
+    let h = create_shell_key(entry_key)?;
+    let result = set_reg_sz(h, "", label).and_then(|_| set_reg_sz(h, "icon", &icon));
+    let _ = RegCloseKey(h);
+    result?;
+
+    notify_shell();
+    if !shell_registered(directory) {
+        return Err("右键菜单项没能写入，请检查注册表权限。".to_string());
     }
-    let mut h = HKEY::default();
-    if RegCreateKeyW(HKEY_CURRENT_USER, PCWSTR(entry_key.as_ptr()), &mut h) == ERROR_SUCCESS {
-        let _ = RegSetValueW(
-            h,
-            PCWSTR::null(),
-            REG_SZ,
-            PCWSTR(label_w.as_ptr()),
-            (label_w.len() * 2) as u32,
+    Ok(())
+}
+
+/// 写失败时把选项页上那一格的勾画回原样。
+unsafe fn restore_shell_row(sh: &mut Shell, row_id: i32, check: bool) {
+    let Some(page) = sh.prop.iter_mut().find(|p| p.id == 219) else {
+        return;
+    };
+    let Some(index) = page.rows.iter().position(|r| r.id == row_id) else {
+        return;
+    };
+    page.rows[index].check = check;
+    let image = row_image(&page.rows[index]);
+    if let Some(item) = item_of_row(page.tree, index) {
+        set_item_image(page.tree, item, image);
+    }
+}
+
+fn report_shell_failure(owner: HWND, why: &str) {
+    let text: Vec<u16> = why.encode_utf16().chain([0]).collect();
+    let title: Vec<u16> = "DogEdit".encode_utf16().chain([0]).collect();
+    unsafe {
+        let _ = MessageBoxW(
+            Some(owner),
+            PCWSTR::from_raw(text.as_ptr()),
+            PCWSTR::from_raw(title.as_ptr()),
+            windows::Win32::UI::WindowsAndMessaging::MB_ICONWARNING | MB_OK,
         );
-        let _ = RegCloseKey(h);
     }
 }
 
@@ -6060,6 +6221,33 @@ mod tests {
 
     fn ink(px: &[u8], size: usize) -> usize {
         (0..size * size).filter(|i| px[i * 4 + 3] != 0 && px[i * 4] == 0).count()
+    }
+
+    /// 两条右键菜单的命令：文件那条普通打开，目录那条 `-g` 带文件夹。
+    /// `-g` 是 `Launch::parse` 认得的唯一形式，写错了点开会变成一个
+    /// 名叫 "-g" 的文件。
+    #[test]
+    fn shell_commands_match_the_launch_parser() {
+        let exe = r"C:\Program Files\DogEdit\dogedit.exe";
+        assert_eq!(
+            shell_command_line(exe, false),
+            "\"C:\\Program Files\\DogEdit\\dogedit.exe\" \"%1\""
+        );
+        assert_eq!(
+            shell_command_line(exe, true),
+            "\"C:\\Program Files\\DogEdit\\dogedit.exe\" -g \"%1\""
+        );
+    }
+
+    /// 程序搬家后，存下来的命令指的是旧 exe —— 这时勾虽然没变也得重写。
+    #[test]
+    fn a_moved_exe_is_detected_without_a_false_prefix_match() {
+        let exe = r"C:\Program Files\DogEdit\dogedit.exe";
+        assert!(command_points_at(&shell_command_line(exe, false), exe));
+        assert!(command_points_at(&shell_command_line(exe, true), exe));
+        assert!(!command_points_at(&shell_command_line(exe, false), r"C:\Old\dogedit.exe"));
+        // `C:\Program` 是 `C:\Program Files` 的前缀，但引号让它不成立。
+        assert!(!command_points_at(&shell_command_line(exe, false), r"C:\Program"));
     }
 
     #[test]

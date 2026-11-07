@@ -5,7 +5,7 @@
 //! `PaintPipeline`. Platform wiring is
 //! pending the M6 milestone.
 
-pub fn run(_path: Option<&str>) -> i32 {
+pub fn run(_launch: &crate::launch::Launch) -> i32 {
     eprintln!("cocoa backend: milestone M6 (not implemented)");
     1
 }

@@ -621,6 +621,9 @@ pub(super) struct Request<'a> {
     pub selection: String,
     /// The active document's path, empty when there is none.
     pub doc_path: String,
+    /// `-g` / 目录右键菜单指定的文件夹。非空时盖过 `[Grep] Folder` 和
+    /// 「跟随当前文件」的预填；普通打开（1408、Ctrl+Shift+F）传空串。
+    pub folder: String,
     pub theme: &'a Theme,
 }
 
@@ -673,6 +676,9 @@ struct Dlg {
     /// What 1408 prefills from.
     selection: String,
     doc_path: String,
+    /// 本次打开带过来的文件夹，用完即清：对话框是单例，下一次 Ctrl+Shift+F
+    /// 不该还钉在上一次目录右键点到的那个文件夹上。
+    initial_folder: String,
     /// The five MRU lists.
     mru: [RefCell<Vec<String>>; 5],
     /// The resize manager's captured state.
@@ -776,6 +782,7 @@ pub(super) fn show(req: Request<'_>) {
                 let st = state_mut(existing);
                 st.selection = req.selection.clone();
                 st.doc_path = req.doc_path.clone();
+                st.initial_folder = req.folder.clone();
             }
             let _ = ShowWindow(existing, SW_SHOW);
             let _ = SetFocus(Some(existing));
@@ -816,6 +823,7 @@ pub(super) fn show(req: Request<'_>) {
             monitor: ini_get_bool(&ini, "Grep", "Monitor", true),
             selection: req.selection.clone(),
             doc_path: req.doc_path.clone(),
+            initial_folder: req.folder.clone(),
             mru: [
                 RefCell::new(mru_load(&ini, "GrepFind")),
                 RefCell::new(mru_load(&ini, "GrepReplace")),
@@ -977,21 +985,23 @@ unsafe fn init(dlg: HWND) -> isize {
     }
     fill_encoding(dlg);
     sync(st, dlg, false, -1);
-    // No folder history yet: the active document's directory becomes the first
-    // dropdown row (the edit text keeps whatever [Grep] Folder said).
+    // No folder history yet: `-g` 指定的文件夹优先，否则用当前文档的目录
+    // 当第一行（编辑框里仍保留 `[Grep] Folder` 的值）。
     if let Ok(c) = GetDlgItem(Some(dlg), ID_DIR) {
         let count = SendMessageW(c, CB_GETCOUNT, None, None).0 as i32;
-        if count <= 0 && !st.doc_path.is_empty() {
-            let parent = parent_of(&st.doc_path);
-            if !parent.is_empty() {
-                let buf: Vec<u16> = parent.encode_utf16().chain([0]).collect();
-                let _ = SendMessageW(
-                    c,
-                    CB_INSERTSTRING,
-                    Some(WPARAM(0)),
-                    Some(LPARAM(buf.as_ptr() as isize)),
-                );
-            }
+        let seed = if !st.initial_folder.is_empty() {
+            st.initial_folder.clone()
+        } else {
+            parent_of(&st.doc_path)
+        };
+        if count <= 0 && !seed.is_empty() {
+            let buf: Vec<u16> = seed.encode_utf16().chain([0]).collect();
+            let _ = SendMessageW(
+                c,
+                CB_INSERTSTRING,
+                Some(WPARAM(0)),
+                Some(LPARAM(buf.as_ptr() as isize)),
+            );
         }
     }
     if let Ok(c) = GetDlgItem(Some(dlg), ID_FIND) {
@@ -1657,7 +1667,15 @@ unsafe fn on_fill(st: &mut Dlg, dlg: HWND) {
             let _ = SendMessageW(c, CB_SETEDITSEL, Some(WPARAM(0)), Some(LPARAM(-1)));
         }
     }
-    if st.monitor && !st.doc_path.is_empty() && Path::new(&st.doc_path).exists() {
+    // `-g` 带来的文件夹赢过「跟随当前文件」：目录右键点开的那一刻，用户
+    // 要搜的就是那个目录，不是当前文档所在的目录。它只作用这一次。
+    let explicit = std::mem::take(&mut st.initial_folder);
+    if !explicit.is_empty() {
+        st.folder = explicit;
+        if !sync(st, dlg, false, ID_DIR) {
+            return;
+        }
+    } else if st.monitor && !st.doc_path.is_empty() && Path::new(&st.doc_path).exists() {
         let parent = parent_of(&st.doc_path);
         if !parent.is_empty() {
             st.folder = parent;

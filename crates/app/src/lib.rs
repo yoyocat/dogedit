@@ -1,6 +1,7 @@
 pub mod app;
 pub mod doctor;
 pub mod download;
+pub mod launch;
 pub mod cmdids;
 pub mod keys;
 pub mod largehl;

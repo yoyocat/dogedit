@@ -57,6 +57,7 @@ mod saveprompt;
 mod snippetwin;
 mod searchdlg;
 mod session;
+mod single_instance;
 mod shape;
 mod shortcutdlg;
 mod skinhint;

@@ -256,8 +256,8 @@ tr:nth-child(even) td{background:var(--zebra)}
 
 <h3 id="firstlaunch">2.2 启动与退出</h3>
 <ul>
-<li><b>启动</b>:双击 <code>dogedit.exe</code>。也可以把文件拖到 exe 上、或在命令行 <code>dogedit.exe 文件名</code> 直接打开文件(命令行文件在会话恢复之后最后打开)。程序没有单实例限制,可以同时开多个窗口。</li>
-<li><b>新建实例</b>:「文件」→「新建实例」再启动一份程序,当前窗口的标签页一个都不动;新窗口不带文件参数,按自己的会话设置启动(默认是一个空白文档)。以 <code>--safe-mode</code> 启动时,新开的实例也是安全模式。</li>
+<li><b>启动</b>:双击 <code>dogedit.exe</code>。也可以把文件拖到 exe 上、或在命令行 <code>dogedit.exe 文件名...</code> 一次打开多个文件(命令行文件在会话恢复之后最后打开)。默认<b>单实例</b>:再启动一次只是把这次的文件交给已经开着的窗口、并把那个窗口带到前台,不会再开一个窗;要另起窗口请勾上「允许多个实例同时运行」或用「文件」→「新建实例」。</li>
+<li><b>新建实例</b>:「文件」→「新建实例」(<code>--new-instance</code>)再启动一份程序,当前窗口的标签页一个都不动;新窗口不带文件参数,按自己的会话设置启动(默认是一个空白文档)。「分离到新实例」和改主题后的重启也带这个参数,所以单实例模式不会把它们转交回旧窗口。以 <code>--safe-mode</code> 启动时,新开的实例也是安全模式。</li>
 <li><b>打开文件的方式</b>:「文件」→「打开」、拖放文件到窗口、目录树双击、「跳转」对话框(Ctrl+P)模糊搜索等。扩展名命中 <code>[HEX] Ext</code>(默认 <code>dat;exe;bin;dll;hex;zip;rar</code>)的文件会直接以十六进制视图打开。</li>
 <li><b>退出</b>:「文件」→「退出」或 <kbd>Alt+F4</kbd>。退出时会先写下会话快照(打开的文件清单、光标、书签、以及「热保存」的未存内容),再逐个询问未保存的文档。</li>
 <li><b>关机退出</b>:Windows 注销/关机同样会保存窗口位置与会话快照。</li>
@@ -1407,9 +1407,9 @@ scripts = ["paint.lua"]          # 可省;缺省 = 目录下所有 *.lua 按文�
 <tr><th>选项</th><th>默认</th><th>说明</th></tr>
 <tr><td>记忆最近打开的文件个数(0~64)</td><td>16</td><td>「最近的文件」菜单长度</td></tr>
 <tr><td>开始页显示最近的文件</td><td>开</td><td>—</td></tr>
-<tr><td>允许多个实例同时运行</td><td>关</td><td>当前版本本就无单实例限制,此开关暂无运行时效果</td></tr>
-<tr><td>右键菜单添加:用 DogEdit 打开</td><td>关</td><td>写注册表,资源管理器所有文件右键加「用 DogEdit 打开」</td></tr>
-<tr><td>右键菜单添加:在文件中查找</td><td>关</td><td>写注册表,目录右键加「用 DogEdit 在文件中查找」</td></tr>
+<tr><td>允许多个实例同时运行</td><td>关</td><td>关着时第二次启动不建窗,把这次的文件(可多个)交给已经开着的窗口并把窗口带到前台;开着时每次启动都另起一个进程。存 <code>[Setting] MulInst</code>。「新建实例」「分离到新实例」和 <code>--safe-mode</code> 不受它限制</td></tr>
+<tr><td>右键菜单添加:用DogEdit打开</td><td>关</td><td>写 <code>HKCU\SOFTWARE\Classes\*\Shell\DogEdit</code>,所有文件的右键菜单加「用DogEdit打开」,命令 <code>"…\dogedit.exe" "%1"</code></td></tr>
+<tr><td>右键菜单添加:在文件中查找</td><td>关</td><td>写 <code>HKCU\SOFTWARE\Classes\Directory\shell\DogEdit</code>,目录右键加「用DogEdit在文件中查找」,命令 <code>"…\dogedit.exe" -g "%1"</code> —— 直接把「在文件中查找和替换」的文件夹预填成该目录</td></tr>
 <tr><td>在菜单上显示一个小剪刀(需重启)</td><td>开</td><td>菜单撕离把手</td></tr>
 <tr><td>主工具条的背景使用系统样式</td><td>开</td><td>—</td></tr>
 <tr><td>在停靠窗口上使用编辑区配色</td><td>关</td><td>面板底色跟随编辑区主题</td></tr>
@@ -1421,6 +1421,11 @@ scripts = ["paint.lua"]          # 可省;缺省 = 目录下所有 *.lua 按文�
 <tr><td>外部工具执行完成后播放提示音</td><td>开</td><td>成功/失败可分别指定 .wav;留空时成功播系统提示音、失败播系统错误音</td></tr>
 <tr><td>成功提示音文件 / 失败提示音文件</td><td>空(系统提示音)</td><td>各选一个 .wav;两行都留空时成功用系统 OK 声、失败用系统错误声</td></tr>
 </table>
+
+<div class="box note"><b>右键菜单的三件事</b><br>
+① 写的是<b>当前用户</b>注册表(<code>HKCU</code>),不需要管理员权限;菜单文字取界面语言表(15141 / 15140),菜单项带程序图标,写完会通知资源管理器刷新。<br>
+② Windows 11 把这类经典菜单项收进「显示更多选项」(Shift+F10 / Shift+右键),不会出现在精简菜单的第一层。<br>
+③ 绿色版搬家后,菜单里存的绝对路径就过期了 —— 再打开一次选项、点「应用」会自动把命令改到新的 exe 路径。安全模式不写注册表,此时改动这两行会给出提示并把勾选弹回去;写失败同样会提示,不会留下「勾上了却没生效」的假状态。</div>
 
 <h3 id="opt-session">23.2 会话</h3>
 <p>见 <a href="#safety">22.2</a> 的五选项表(恢复文件 / 光标 / 书签 / 热保存 / 临时文件夹),不赘述。</p>
@@ -1711,7 +1716,9 @@ C+F3=cm_find_nextword      ; 键名:字母/数字/标点直接写;F1..F24、Up�
 <h2>25 命令行参考</h2>
 <table>
 <tr><th>参数</th><th>行为</th></tr>
-<tr><td><code>dogedit.exe [文件...]</code></td><td>打开指定文件(会话恢复之后最后打开);命中 <code>[HEX] Ext</code> 的进十六进制视图</td></tr>
+<tr><td><code>dogedit.exe [文件...]</code></td><td>一次可给多个文件,按命令行顺序打开(会话恢复之后最后打开);命中 <code>[HEX] Ext</code> 的进十六进制视图。单实例模式下这些文件会被转交给已经开着的窗口</td></tr>
+<tr><td><code>-g &lt;目录&gt;</code> / <code>--grep &lt;目录&gt;</code></td><td>开窗后直接弹出「在文件中查找和替换」,文件夹预填成该目录。目录右键菜单的「用DogEdit在文件中查找」用的就是 <code>-g</code></td></tr>
+<tr><td><code>--new-instance</code></td><td>一定另起一个进程,不把文件转交给旧窗口。「新建实例」「分离到新实例」和改主题后的重启内部都带这个参数</td></tr>
 <tr><td><code>--selftest</code></td><td>不开窗,跑编辑器核心自检,输出 <code>selftest: OK</code> / <code>selftest: FAILED</code>(退出码 0/1)</td></tr>
 <tr><td><code>--ui-lint &lt;脚本.lua&gt;</code></td><td>不开窗,离线体检一个绘制脚本(跑每个画法并报账)</td></tr>
 <tr><td><code>--ui-doctor</code></td><td>不开窗,把脚本包真装一遍并检查全部主题,输出诊断报告;错误退出码 1</td></tr>
@@ -1721,8 +1728,8 @@ C+F3=cm_find_nextword      ; 键名:字母/数字/标点直接写;F1..F24、Up�
 <tr><td><code>--skin-debug</code></td><td>开窗,绘制纯度检查(每个回调跑两遍比对;退出报总账)</td></tr>
 <tr><td><code>--paint-stats</code></td><td>开窗,绘制计时统计(环境变量 <code>DOGEDIT_PAINT_STATS</code> 等价)</td></tr>
 </table>
-<p>启动流程要点:先读语言表 → Per-Monitor DPI 感知 → 装载脚本包(注册命令才有资格进菜单)→ 按上次退出记录摆窗 → 恢复状态栏次序、备份定时器、皮肤/主题热重载 → 备份恢复询问(如有)→ 会话恢复 → 打开命令行文件。其余 <code>--</code> 参数静默忽略。</p>
-<p>程序无单实例限制;窗口位置存 <code>[Window] Rect/Zoomed</code>。</p>
+<p>启动流程要点:先判单实例(<code>[Setting] MulInst</code> 为关且有同名互斥体时,把请求编成 <code>WM_COPYDATA</code> 交给旧窗口就退出)→ 读语言表 → Per-Monitor DPI 感知 → 装载脚本包(注册命令才有资格进菜单)→ 按上次退出记录摆窗 → 恢复状态栏次序、备份定时器、皮肤/主题热重载 → 备份恢复询问(如有)→ 会话恢复 → 打开命令行文件 → 处理 <code>-g</code>。其余 <code>--</code> 参数静默忽略。</p>
+<p><b>单实例</b>:互斥体名字带 exe 路径的指纹,所以放在两个目录里的两份 DogEdit 不会互相抢文件;旧窗口靠窗口属性 <code>DogEdit.Instance</code> 认人。<code>MulInst=Y</code>、<code>--new-instance</code>、<code>--safe-mode</code> 三种情况都直接开新进程。转交的内容是一段带版本号的 UTF-8 请求,文件与 <code>-g</code> 都能带过去;旧窗口没应答时新进程会自己开窗,不会把用户挡在门外。窗口位置存 <code>[Window] Rect/Zoomed</code>。</p>
 </section>
 
 <!-- ==================== 26 数据文件 ==================== -->
@@ -1812,7 +1819,7 @@ Snippet=Y              ; 内容经片段引擎展开(${n:…} / $0),限 4KB</cod
 <tr><td>扩展</td><td>扩展管理器、从本地文件安装扩展、保存为脚本、宏编辑、FTP/SFTP、Git 面板、收藏夹与命令窗口两个面板</td></tr>
 <tr><td>帮助</td><td>检查更新、报告错误、快捷键列表、关联帮助、清除注册信息、打开安装目录、关于(仅「在线帮助」可用)</td></tr>
 <tr><td>打印</td><td>打印与打印预览(选项 → 打印页可先配置)</td></tr>
-<tr><td>设置</td><td>「允许多个实例同时运行」开关、「当文件小于?(MB)时直接用内存打开」(大文件阈值内置 50 MB)、撤销深度无设置页(固定 1000 步)</td></tr>
+<tr><td>设置</td><td>「当文件小于?(MB)时直接用内存打开」(大文件阈值内置 50 MB)、撤销深度无设置页(固定 1000 步)</td></tr>
 <tr><td>正则</td><td>环视断言 <code>(?=) (?!) (?&lt;=) (?&lt;!)</code> 与 <code>\c \j \J \P</code> 预设记号(引擎不支持,写出不产生匹配)</td></tr>
 <tr><td>HEX</td><td>跳转到偏移、字节搜索</td></tr>
 <tr><td>Lua 事件</td><td>仅 <code>doc.saved</code> / <code>doc.opened</code> 有触发点;其余事件名可注册但不触发</td></tr>

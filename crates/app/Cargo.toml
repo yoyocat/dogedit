@@ -72,6 +72,8 @@ windows = { version = "0.62", features = [
     # `GetProfileStringW`，默认打印机名在 `windows` 配置节里。
     "Win32_System_WindowsProgramming",
     "Win32_System_Threading",
+    # `CreateMutexW` 的签名带 `SECURITY_ATTRIBUTES`，单实例互斥体要这个 feature。
+    "Win32_Security",
     "Win32_System_Diagnostics_Debug",
     "Win32_System_LibraryLoader",
     "Win32_System_DataExchange",
