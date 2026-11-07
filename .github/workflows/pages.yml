@@ -27,10 +27,10 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Configure Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       # 两份单页 HTML 文档发布时并入站点目录，它们之间的相对链接因此仍然有效。
       - name: Stage docs
@@ -38,11 +38,13 @@ jobs:
           mkdir -p site/docs
           cp docs/user_manual.html docs/script_api.html site/docs/
 
+      # v5 起默认排除点文件，站点根目录的 .nojekyll 要显式带上
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: site
+          include-hidden-files: true
 
       - name: Deploy
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
