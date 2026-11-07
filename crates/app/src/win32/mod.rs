@@ -39,6 +39,7 @@ pub mod lang;
 mod markdlg;
 mod menu;
 mod menubar;
+mod menutip;
 mod minifind;
 mod notify;
 mod optionsdlg;

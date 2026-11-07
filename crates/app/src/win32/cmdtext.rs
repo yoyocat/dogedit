@@ -343,6 +343,8 @@ pub(super) const CMD_TEXT: &[(u32, &str, &str)] = &[
     (2010, "在线帮助", "显示 DogEdit 的在线帮助文件"), // cm_misc_apphelp
     (2012, "新建实例", "打开一个 DogEdit 新实例"), // cm_new_instance
     (36007, "重新扫描解析器", "重读解析器目录的插件包并列出结果"), // cm_plugin_rescanparsers (本实现扩展)
+    (36012, "脚本包", "启用或停用脚本包，查看它为什么没在跑"), // cm_config_package (本实现扩展)
+    (36013, "新建脚本", "按模板新建散装 Lua 脚本或脚本包"), // cm_script_new (本实现扩展)
     (57600, "新建", "创建一个新的文档"), // cm_file_new
     (57601, "打开", "打开已存在的文档"), // cm_file_open
     (57603, "保存", "保存当前文档"), // cm_file_save

@@ -16,6 +16,8 @@ r"""组装便携版 zip（绿色版）到 dist\：exe + 随包数据 + 许可文
     template.ini + template\    新建文件模板 —— 唯一没有内建副本的数据，必须随包
     lang\ themes\             语言表 / 主题（exe 里有内建副本，带上是为了让用户
                             能直接改外置文件）
+    docs\                     用户手册与脚本 API；「在线帮助」(F1) 就在 exe 旁边
+                            找这个目录，缺了它帮助命令只能报「没找到帮助文件」
     packages\                 脚本包；示例包 luapaint / snake 不进发布包，只在仓库
                             里当脚本 API 的例子（没有其它包时这个目录整个不带）
     LICENSE NOTICE README.md licenses\    许可文本与图标出处声明
@@ -46,6 +48,10 @@ ICON_SOURCES = Path("crates/app/assets/icons/SOURCES.txt")
 # 不进发布包的脚本包：示例包留在仓库里给大家照着写就够了，随包发出去会被自动装
 # 上，而用户改不动它（Bundled 是只读根）
 PACKAGES_EXCLUDED = {"luapaint", "snake"}
+
+# 帮助命令真正会打开的页面。user_manual.html 是 F1 的首选，script_api.html
+# 是手册里唯一的外链；两者缺一，发布包里的「在线帮助」就是坏的。
+DOCS_REQUIRED = ("user_manual.html", "script_api.html")
 
 
 def utf8_stdio() -> None:
@@ -144,6 +150,18 @@ def copy_tree(src: Path, dst: Path) -> None:
     shutil.copytree(src, dst)
 
 
+def copy_docs(src: Path, dst: Path) -> None:
+    r"""随包文档：整棵 docs\ 复制，打包前先钉住帮助命令要用的那两页。
+
+    README 也链到 docs\ 里的设计笔记，只挑两页带走会把那些链接留在包里断着，
+    所以这里是整棵树。校验放在复制前，缺页直接中止而不是发出一个坏包。
+    """
+    for name in DOCS_REQUIRED:
+        if not (src / name).is_file():
+            die(f"缺少随包文档 {src.relative_to(ROOT) / name}，在线帮助打不开")
+    copy_tree(src, dst)
+
+
 def copy_packages(src: Path, dst: Path) -> None:
     """脚本包：按 PACKAGES_EXCLUDED 剔除示例包，剩下的逐个目录复制。"""
     if not src.is_dir():
@@ -175,6 +193,7 @@ def stage(exe: Path, ver: str, parsers: str) -> Path:
     copy_tree(ROOT / "template", top / "template")
     copy_tree(ROOT / "lang", top / "lang")
     copy_tree(ROOT / "themes", top / "themes")
+    copy_docs(ROOT / "docs", top / "docs")
     copy_packages(ROOT / "packages", top / "packages")
     copy_file(ROOT / "LICENSE", top / "LICENSE")
     copy_file(ROOT / "NOTICE", top / "NOTICE")
@@ -200,6 +219,16 @@ def make_zip(stage_root: Path, ver: str) -> Path:
             if path.is_file():
                 z.write(path, path.relative_to(stage_root).as_posix())
     return zip_path
+
+
+def check_help(zip_path: Path, ver: str) -> None:
+    """最后再看一眼 zip 内部的路径：帮助读的是 `<exe>\\docs`，不是仓库根目录。"""
+    with zipfile.ZipFile(zip_path) as z:
+        names = set(z.namelist())
+    prefix = f"dogedit-{ver}/docs/"
+    for name in DOCS_REQUIRED:
+        if prefix + name not in names:
+            die(f"发布包缺少 {prefix}{name}，在线帮助打不开")
 
 
 def make_sha256(zip_path: Path) -> Path:
@@ -228,6 +257,7 @@ def main() -> None:
     selftest(exe)
     stage_root = stage(exe, ver, args.parsers)
     zip_path = make_zip(stage_root, ver)
+    check_help(zip_path, ver)
     sha_path = make_sha256(zip_path)
     shutil.rmtree(stage_root)
 

@@ -895,6 +895,29 @@ mod tests {
         assert!(bar.iter().all(|p| !p.children.is_empty()));
     }
 
+    /// Every Chinese-caption leaf in the bar needs a row in both bundled
+    /// language tables: with no `[MENU128]` entry `localize_menu` leaves the
+    /// Chinese literal on screen, which is exactly how 新建脚本 and 脚本包
+    /// stayed Chinese on an English UI. Language-neutral captions (`80%`,
+    /// `PC (CR+LF)`) need no translation and are skipped.
+    #[test]
+    fn every_chinese_bar_leaf_is_in_both_tables() {
+        let cjk = |s: &str| s.chars().any(|c| ('\u{4e00}'..='\u{9fff}').contains(&c));
+        let mut missing = Vec::new();
+        for &(depth, kind, id, caption) in ROWS {
+            if depth == 0 || kind != LEAF || id == 0 || !cjk(caption) {
+                continue;
+            }
+            let zh = crate::win32::lang::builtin_bar_caption(false, id);
+            let en = crate::win32::lang::builtin_bar_caption(true, id);
+            let translated = matches!(&en, Some(text) if !cjk(text));
+            if zh.is_none() || !translated {
+                missing.push((id, caption, zh, en));
+            }
+        }
+        assert!(missing.is_empty(), "bar rows without a translation: {missing:?}");
+    }
+
     #[test]
     fn no_leaf_id_clashes_with_the_status_strip() {
         // The strip posts `WM_COMMAND` with its own control id in the low word,

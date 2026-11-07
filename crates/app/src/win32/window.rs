@@ -37,6 +37,7 @@ use crate::win32::markdlg;
 use crate::win32::themedlg;
 use crate::win32::menu;
 use crate::win32::menubar;
+use crate::win32::menutip;
 use crate::win32::minifind;
 use crate::win32::opendocs::{DocsNotify, OpenDocEntry};
 use crate::win32::outlinewin::{MAX_ROWS, outline_rows, OutlineNotify};
@@ -474,6 +475,9 @@ const THEME_WATCH_TIMER_ID: usize = 15;
 /// 监视该文件变更的轮询：一秒一跳的秒表，各文档按自己的档位
 /// （定时读取的秒数、否则隔两秒）对表。
 const WATCH_TIMER_ID: usize = 16;
+/// 菜单行提示的延时/自动收起。1..16 都被主框架各路轮询占着，17 是下一个空号；
+/// 定时器与提示宿主都挂在主框架上，所以号只能在这一组里挑。
+pub(super) const MENU_TIP_TIMER_ID: usize = 17;
 /// 备份树的整树回收隔多久跑一次。
 const BACKUP_GC_EVERY: std::time::Duration = std::time::Duration::from_secs(3600);
 /// 大文件流式搜索的进行时状态（字段挂在 EditorState::large_search）。
@@ -2002,6 +2006,18 @@ fn help_dir_from(base: &std::path::Path) -> Option<std::path::PathBuf> {
     [base.join("docs"), base.join("../../docs")]
         .into_iter()
         .find(|p| p.is_dir())
+}
+
+/// What 在线帮助 actually hands to the shell: the manual itself when the
+/// folder carries it, otherwise the folder so the reader can still pick a page.
+/// A folder listing is a poor answer to F1; a release that forgot `docs` is not
+/// an answer at all, and `None` keeps the command's "no help files" message.
+const HELP_MANUAL: &str = "user_manual.html";
+
+fn help_target_from(base: &std::path::Path) -> Option<std::path::PathBuf> {
+    let dir = help_dir_from(base)?;
+    let manual = dir.join(HELP_MANUAL);
+    Some(if manual.is_file() { manual } else { dir })
 }
 
 /// How many characters the block may hold before 高级排序 asks about writing the
@@ -22679,6 +22695,7 @@ impl EditorState {
     /// the program. The caption says 在线, and what this build carries is the `docs`
     /// folder next to the executable — there is no site of its own to name, and an
     /// address invented here would only be a guess about where the reader ends up.
+    /// F1 goes straight to the manual; a folder without it still opens the folder.
     fn show_help(&mut self, hwnd: HWND) {
         let Ok(exe) = std::env::current_exe() else {
             return;
@@ -22686,13 +22703,13 @@ impl EditorState {
         let Some(base) = exe.parent() else {
             return;
         };
-        let Some(dir) = help_dir_from(base) else {
+        let Some(target) = help_target_from(base) else {
             // Said out loud: a key that does nothing and says nothing is the
             // reading the reader cannot tell apart from a broken build.
             self.show_status_message(hwnd, "没有找到随包的帮助文件（docs）".to_string());
             return;
         };
-        let mut wide: Vec<u16> = dir.to_string_lossy().encode_utf16().collect();
+        let mut wide: Vec<u16> = target.to_string_lossy().encode_utf16().collect();
         wide.push(0);
         unsafe {
             let _ = ShellExecuteW(
@@ -24062,6 +24079,9 @@ pub fn run(path: Option<&str>) -> i32 {
         // only place to catch them is the thread's own creation hook. The bar
         // menu already exists; this is for every popup after it.
         menu::install_popup_hook();
+        // 菜单选中消息会发给菜单的 owner，不一定是主框架；用线程内的
+        // 消息钩子统一接住，工具条弹出的右键菜单也有说明提示。
+        menutip::install_hook();
 
         let mut msg = MSG::default();
         while GetMessageW(&mut msg, None, 0, 0).as_bool() {
@@ -26611,6 +26631,11 @@ unsafe extern "system" fn window_proc(
             DefWindowProcW(hwnd, msg, wparam, lparam)
         }
         WM_TIMER => {
+            // 菜单行的说明提示：这一拍要么把待弹的放上屏幕，要么把弹够的收掉。
+            // 不碰编辑器状态，菜单模态循环里也可以安全地跑。
+            if wparam.0 as usize == MENU_TIP_TIMER_ID {
+                menutip::on_timer(hwnd, MENU_TIP_TIMER_ID);
+            }
             if wparam.0 as usize == LOAD_TIMER_ID {
                 if let Some(st) = state_mut(hwnd) {
                     st.on_load_events(hwnd);
@@ -26910,6 +26935,7 @@ unsafe extern "system" fn window_proc(
                 }
                 menu::clear_style();
                 menu::remove_popup_hook();
+                menutip::shutdown();
                 // Leave the clipboard viewer chain on the
                 // way out, the way toggle-off does.
                 if st.watch_clipboard && !st.next_clipboard_viewer.0.is_null() {
@@ -36474,7 +36500,7 @@ mod chord_behaviour_tests {
 
     /// Where 在线帮助 looks for the documentation, and what it does when the folder
     /// is not there — the command says so instead of opening a window on nothing.
-    /// Only the lookup is tested here; opening the folder is the shell's business.
+    /// Only the lookup is tested here; opening the result is the shell's business.
     #[test]
     fn the_help_lookup_reads_the_bundled_docs() {
         let root = help_temp("beside");
@@ -36508,7 +36534,24 @@ mod chord_behaviour_tests {
         std::fs::remove_dir_all(&root).expect("clean up");
     }
 
-    /// A unique temporary root, so the two help tests cannot read each other's
+    /// A packaged release carries `docs\\user_manual.html`: F1 opens that page,
+    /// not a directory listing. A folder without the manual still opens the
+    /// folder, so a custom help set keeps working.
+    #[test]
+    fn the_help_command_prefers_the_bundled_manual() {
+        let root = help_temp("manual");
+        let bin = root.join("pkg");
+        let docs = bin.join("docs");
+        std::fs::create_dir_all(&docs).expect("temp tree");
+        assert_eq!(help_target_from(&bin), Some(docs.clone()), "no manual yet");
+        let manual = docs.join(HELP_MANUAL);
+        std::fs::write(&manual, b"<html></html>").expect("manual");
+        assert_eq!(help_target_from(&bin), Some(manual));
+        assert_eq!(help_target_from(&root.join("no-docs")), None);
+        std::fs::remove_dir_all(&root).expect("clean up");
+    }
+
+    /// A unique temporary root, so the help tests cannot read each other's
     /// folders.
     fn help_temp(tag: &str) -> std::path::PathBuf {
         std::env::temp_dir().join(format!(

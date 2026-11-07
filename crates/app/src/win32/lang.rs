@@ -421,6 +421,14 @@ pub(super) fn menu(section: u32, id: u32) -> Option<&'static str> {
         .map(|s| s.as_str())
 }
 
+/// Test hook: one `[MENU128]` value straight out of a built-in table, so the
+/// bar's own rows can be checked without loading a locale into `LOCALE`.
+#[cfg(test)]
+pub(super) fn builtin_bar_caption(english: bool, id: u32) -> Option<String> {
+    let code = if english { EN_US } else { ZH_CN };
+    table_from(builtin(code)?).menu.get(&(128, id)).cloned()
+}
+
 /// A `DLG` caption by control id.
 pub(super) fn dlg(dialog: u32, id: u32) -> Option<&'static str> {
     LOCALE
@@ -789,6 +797,59 @@ mod tests {
                 "the options page's follow-system caption"
             );
         }
+    }
+
+    /// 扩展 > 新建脚本 / 脚本包 are implementation-added commands; both need
+    /// a bar caption and a 命令/说明 pair in each table, otherwise the shortcut
+    /// manager and the toolbar tooltips fall back to the Chinese literals.
+    #[test]
+    fn the_script_commands_have_english_rows() {
+        let en = table(EN_US);
+        let zh = table(ZH_CN);
+        assert_eq!(
+            en.menu.get(&(128, 36013)).map(String::as_str),
+            Some("&New script…")
+        );
+        assert_eq!(
+            en.menu.get(&(128, 36012)).map(String::as_str),
+            Some("Script &packages…")
+        );
+        assert_eq!(
+            zh.menu.get(&(128, 36013)).map(String::as_str),
+            Some("新建脚本(&N)...")
+        );
+        assert_eq!(
+            zh.menu.get(&(128, 36012)).map(String::as_str),
+            Some("脚本包(&K)...")
+        );
+        for id in [36012, 36013] {
+            let (name, desc) = (
+                en.string.get(&id).map(String::as_str),
+                zh.string.get(&id).map(String::as_str),
+            );
+            assert!(name.is_some_and(|s| s.contains("\\n")), "en STRING {id}");
+            assert!(desc.is_some_and(|s| s.contains("\\n")), "zh STRING {id}");
+        }
+        // The bar's path: `tree()` hands the Chinese literal as the fallback
+        // and asks `menu_item_text` by command id.
+        let mut loc = Locale {
+            code: EN_US,
+            current: en,
+            canonical: zh,
+            reverse: HashMap::new(),
+            popup_index: HashMap::new(),
+        };
+        loc.build_indexes();
+        assert_eq!(
+            loc.menu_item_text(128, 36013, false, "新建脚本(&N)...")
+                .as_deref(),
+            Some("&New script…")
+        );
+        assert_eq!(
+            loc.menu_item_text(128, 36012, false, "脚本包(&K)...")
+                .as_deref(),
+            Some("Script &packages…")
+        );
     }
 
     #[test]
