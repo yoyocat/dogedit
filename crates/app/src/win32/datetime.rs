@@ -8,13 +8,13 @@
 //! dialog template rather than guesswork: the 自定义日期/时间的格式 box is 209×72 dialog units with the seven items listed below.
 //! Divided by that 1.25 scale this is a uniform **1.6 logical px per dialog unit**, which is what the rectangles here
 //! are; the window's own 436×191 becomes 349×153. Control 1202 is the dropdown arrow at the edit's right edge. The
-//! date-time dialog init gives it a 9-point `Marlett` font — the only control in the dialog whose font the code sets,
-//! because the other six take the template's `Ms Shell Dlg 8` through the dialog manager — and captions it with the
-//! single character `4`, which in Marlett is the down arrow. The dropdown click handles its click: load the date/time
-//! token menu, take its submenu, `TrackPopupMenu` it at the button's bottom-left corner with `TPM_RETURNCMD |
-//! TPM_NONOTIFY`, and insert the chosen token into edit 1201 at the caret. The nineteen rows and their captions are
-//! [`TOKEN_ROWS`]; the dialog font is applied here because these children come from `CreateWindowExW`, which no dialog
-//! manager is filling in.
+//! date-time dialog init gives it a 9-point `Marlett` font and captions it with the single character `4`, which in
+//! Marlett is the down arrow. The other six controls get the app's UI font (`uifont::create`) rather than the 8 pt
+//! `Ms Shell Dlg` this window used to hardcode, so they read the same size as the other dialogs. The dropdown click
+//! handles its click: load the date/time token menu, take its submenu, `TrackPopupMenu` it at the button's bottom-left
+//! corner with `TPM_RETURNCMD | TPM_NONOTIFY`, and insert the chosen token into edit 1201 at the caret. The nineteen
+//! rows and their captions are [`TOKEN_ROWS`]; the font pass is explicit because these children come from
+//! `CreateWindowExW`, which no dialog manager is filling in.
 
 #![allow(unsafe_op_in_unsafe_fn)]
 
@@ -81,8 +81,9 @@ const RECT_CANCEL: (i32, i32, i32, i32) = (243, 37, 80, 22);
 const DLG_W: i32 = 349;
 const DLG_H: i32 = 153;
 
-/// The template's dialog font.
-const SHELL_FONT_TENTHS: i32 = 80;
+/// The arrow button's 9 pt Marlett; the rest of the controls use the app's UI
+/// font (`uifont::create`), not the 8 pt shell dialog font this window used to
+/// hardcode.
 const MARLETT_FONT_TENTHS: i32 = 90;
 
 /// One row of the arrow's menu: a date/time token's command id and caption, and
@@ -254,7 +255,10 @@ pub(super) fn dialog(owner: HWND, date: &str, time: &str) -> Option<(String, Str
         let dpi_i = GetDpiForWindow(owner).max(96) as i32;
         let scale = |v: i32| (v as f32 * dpi).round() as i32;
         // They live as long as the window: `dialog` blocks until it is gone.
-        let shell = make_font("MS Shell Dlg", SHELL_FONT_TENTHS, dpi_i);
+        // `CreateWindowExW` gives the children the stock system font, which is
+        // 8 pt and reads small next to the rest of the chrome; the UI font is
+        // what every other dialog hands its children.
+        let shell = crate::win32::uifont::create(dpi_i);
         let marlett = make_font("Marlett", MARLETT_FONT_TENTHS, dpi_i);
 
         let title16 = wide(crate::win32::lang::dlg(259, 0).unwrap_or(TITLE));
@@ -350,8 +354,8 @@ pub(super) fn dialog(owner: HWND, date: &str, time: &str) -> Option<(String, Str
         );
 
         // the date-time dialog init's first two steps, in its own order: the arrow gets
-        // Marlett and the caption `4`, everything else the template's dialog font
-        // the dialog manager would have handed out.
+        // Marlett and the caption `4`, everything else the app's UI font. The
+        // id list below deliberately leaves ID_ARROW out so its glyph font wins.
         crate::win32::lang::localize_dialog(hwnd, 259);
         if let Ok(a) = GetDlgItem(Some(hwnd), ID_ARROW) {
             set_font(a, marlett);

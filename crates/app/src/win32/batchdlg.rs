@@ -27,7 +27,7 @@ use crate::win32::wstr::wide;
 use windows::core::{PCWSTR, PWSTR};
 use windows::Win32::Foundation::{HWND, LPARAM, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::{
-    CreateSolidBrush, DeleteObject, FillRect, HBRUSH, HDC, RedrawWindow, UpdateWindow,
+    CreateSolidBrush, DeleteObject, FillRect, HBRUSH, HDC, HFONT, RedrawWindow, UpdateWindow,
     RDW_ALLCHILDREN, RDW_ERASE, RDW_INVALIDATE, RDW_UPDATENOW,
 };
 use windows::Win32::UI::Controls::Dialogs::{
@@ -165,6 +165,9 @@ struct Ctx {
     ink: COLORREF,
     face: COLORREF,
     field_face: COLORREF,
+    /// The UI font handed to the children in `WM_INITDIALOG`; the template's
+    /// 8 pt `DS_SETFONT` block stays as the dialog-unit ruler.
+    font: HFONT,
 }
 
 fn lt(id: u32, fallback: &str) -> String {
@@ -239,6 +242,7 @@ pub(super) fn open(state: &mut EditorState, hwnd: HWND) {
         ink: to_colorref(theme.toolbar_fg),
         face: to_colorref(theme.toolbar_bg),
         field_face: to_colorref(theme.toolbar_field),
+        font: unsafe { crate::win32::uifont::create(crate::win32::uifont::window_dpi(hwnd)) },
     });
     let ptr = &mut *ctx as *mut Ctx;
     let tmpl = build_template(DLG_TITLE, DLG_STYLE, DLG_W, DLG_H, 0, ITEMS);
@@ -260,6 +264,7 @@ pub(super) fn open(state: &mut EditorState, hwnd: HWND) {
     unsafe {
         let _ = DeleteObject(ctx.bg.into());
         let _ = DeleteObject(ctx.field.into());
+        let _ = DeleteObject(ctx.font.into());
     }
 }
 
@@ -419,6 +424,9 @@ unsafe extern "system" fn dialog_proc(
         WM_INITDIALOG => {
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, lparam.0 as isize);
             let ctx = ctx(hwnd);
+            // The template hands the children its 8 pt `Ms Shell Dlg`; replace
+            // just their text font before the captions are localized.
+            crate::win32::uifont::set_children(hwnd, ctx.font);
             localize_dialog(hwnd, 208);
             let dark = chrome::theme_is_dark(&ctx.theme);
             chrome::set_chrome_theme(&ctx.theme);

@@ -7,6 +7,8 @@
 //!   271×90 dialog units, font `Ms Shell Dlg 8`, three children in this order:
 //!   the default Button `BS_DEFPUSHBUTTON` at 107,69 50×14, a read-only multiline
 //!   Edit `ES_MULTILINE | ES_READONLY` at 7,7 257×40, and a Static at 7,48 257×20.
+//!   The 8 pt block stays as the dialog-unit ruler; the children's text is
+//!   replaced with the app's UI font in `WM_INITDIALOG`.
 //! * **Captions** — from the language table: 查找中 as the title (untranslated it
 //!   reads `Grep ing`), 停止 on the button, and `行数:%d` in the static.
 //! * **The updater** — format `行数:%d` with the running count, then set the text
@@ -33,7 +35,7 @@ use std::time::Instant;
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, RECT, WPARAM};
 use windows::core::PCWSTR;
 use windows::Win32::Graphics::Gdi::{
-    CreateSolidBrush, DeleteObject, FillRect, HBRUSH, HDC, RedrawWindow, UpdateWindow,
+    CreateSolidBrush, DeleteObject, FillRect, HBRUSH, HDC, HFONT, RedrawWindow, UpdateWindow,
     RDW_ALLCHILDREN, RDW_ERASE, RDW_INVALIDATE, RDW_UPDATENOW,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow;
@@ -100,6 +102,9 @@ struct Inner {
     ink: COLORREF,
     face: COLORREF,
     field_face: COLORREF,
+    /// The UI font for the three children; the template's 8 pt `DS_SETFONT`
+    /// block stays as the dialog-unit ruler.
+    font: HFONT,
 }
 
 /// The live progress dialog's `HWND`, so a second scan finds the window it already
@@ -142,6 +147,9 @@ pub(super) fn open_named(frame: HWND, theme: &Theme, lock: bool, title: &str) ->
         ink: to_colorref(theme.toolbar_fg),
         face: to_colorref(theme.toolbar_bg),
         field_face: to_colorref(theme.toolbar_field),
+        font: unsafe {
+            crate::win32::uifont::create(crate::win32::uifont::window_dpi(frame))
+        },
     });
     let param = LPARAM(Box::into_raw(boxed) as isize);
     let tmpl = build_template(title);
@@ -157,7 +165,8 @@ pub(super) fn open_named(frame: HWND, theme: &Theme, lock: bool, title: &str) ->
         Ok(h) => h,
         Err(_) => {
             unsafe {
-                drop(Box::from_raw(param.0 as *mut Inner));
+                let inner = Box::from_raw(param.0 as *mut Inner);
+                let _ = DeleteObject(inner.font.into());
             }
             return Prog {
                 dlg: HWND::default(),
@@ -309,6 +318,7 @@ unsafe extern "system" fn dialog_proc(
     match msg {
         WM_INITDIALOG => {
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, lparam.0 as isize);
+            crate::win32::uifont::set_children(hwnd, state(hwnd).font);
             crate::win32::lang::localize_dialog(hwnd, 222);
             1
         }
@@ -354,6 +364,7 @@ unsafe extern "system" fn dialog_proc(
                 let b = Box::from_raw(ptr);
                 let _ = DeleteObject(b.bg.into());
                 let _ = DeleteObject(b.field.into());
+                let _ = DeleteObject(b.font.into());
             }
             0
         }

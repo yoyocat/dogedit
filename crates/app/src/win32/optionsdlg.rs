@@ -2748,6 +2748,10 @@ unsafe extern "system" fn page_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM
             let init = &mut *(lp.0 as *mut PropInit);
             let sh = &mut *init.shell;
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, init.shell as isize);
+            // The page template's 8 pt font only decides dialog units; the
+            // tree and its sibling statics draw with the UI font like every
+            // other page. `prepare_tree` sets the tree again below.
+            set_font_deep(hwnd, sh.font);
             if let Some(page) = build_prop_rows(sh, hwnd, init.id) {
                 init.built = Some(page);
                 // The page's own controls ask for the dark parts; the page

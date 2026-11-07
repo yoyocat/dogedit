@@ -17,14 +17,15 @@
 
 /// Shared DPI rule; re-exported so `uifont::scaled` callers keep their path.
 pub(super) use crate::win32::dpi::scaled;
-use windows::Win32::Foundation::HWND;
+use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
 use windows::Win32::Graphics::Gdi::{
     CreateFontIndirectW, DEFAULT_CHARSET, DEFAULT_GUI_FONT, GetObjectW, GetStockObject, HFONT,
     LOGFONTW,
 };
 use windows::Win32::UI::HiDpi::SystemParametersInfoForDpi;
 use windows::Win32::UI::WindowsAndMessaging::{
-    NONCLIENTMETRICSW, SPI_GETICONTITLELOGFONT, SPI_GETNONCLIENTMETRICS,
+    GetWindow, GW_CHILD, GW_HWNDNEXT, NONCLIENTMETRICSW, SPI_GETICONTITLELOGFONT,
+    SPI_GETNONCLIENTMETRICS, SendMessageW, WM_SETFONT,
 };
 
 /// the UI-font helper's switch over the preset ids: the face and the size in
@@ -175,6 +176,34 @@ pub(super) unsafe fn window_dpi(hwnd: HWND) -> i32 {
     windows::Win32::UI::HiDpi::GetDpiForWindow(hwnd).max(96) as i32
 }
 
+/// Hand `font` to every direct child of `dlg`.
+///
+/// A `DLGTEMPLATEEX` carries one `DS_SETFONT` block, and the dialog manager
+/// uses it twice: it gives that 8 pt `Ms Shell Dlg` to every control, and it
+/// derives the dialog units the whole layout is measured in from the same
+/// metrics. Only the first half may be undone — replacing this block with a
+/// 9 pt face would rescale every rect in the template as well. So the block
+/// stays byte-for-byte as it is and the children get the UI font afterwards.
+/// `encdlg`'s init is the same pass written out by hand; this is the one call
+/// the other template dialogs use.
+///
+/// The caller owns `font` for as long as the window lives.
+pub(super) unsafe fn set_children(dlg: HWND, font: HFONT) {
+    if font.is_invalid() {
+        return;
+    }
+    let mut child = GetWindow(dlg, GW_CHILD).unwrap_or_default();
+    while !child.0.is_null() {
+        let _ = SendMessageW(
+            child,
+            WM_SETFONT,
+            Some(WPARAM(font.0 as usize)),
+            Some(LPARAM(1)),
+        );
+        child = GetWindow(child, GW_HWNDNEXT).unwrap_or_default();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -223,6 +252,68 @@ mod tests {
             let lf = logfont(120).expect("the system answers for the desktop DPI");
             assert_eq!(lf.lfWeight, 400);
             assert_eq!(lf.lfHeight, -15, "9 pt at 120 DPI is 15 px of ascent");
+        }
+    }
+
+    /// Why the pass exists: a template's `DS_SETFONT` block is literally 8 pt,
+    /// while the UI font is the system's 9 pt menu font. At 120 DPI that is
+    /// 13 px against 15 px — small enough to notice next to every other
+    /// dialog, and the reason a dialog that skips `set_children` looks wrong.
+    #[test]
+    fn the_template_font_is_smaller_than_the_ui_font() {
+        let legacy = crate::win32::gdi::pixel_height(120, 8.0);
+        let ui = unsafe { logfont(120) }
+            .expect("the system answers for the desktop DPI")
+            .lfHeight
+            .abs();
+        assert_eq!(legacy, 13, "8 pt at 120 DPI is 13 px");
+        assert!(ui > legacy, "9 pt is visibly bigger than the template's 8 pt");
+    }
+
+    /// The dialog manager gives the template's 8 pt font to every child. This
+    /// pass is what replaces it on real windows without touching the template's
+    /// `DS_SETFONT` block (which is also the dialog-unit ruler).
+    #[test]
+    fn set_children_hands_one_font_to_every_child() {
+        use windows::core::{PCWSTR, w};
+        use windows::Win32::Graphics::Gdi::DeleteObject;
+        use windows::Win32::UI::WindowsAndMessaging::{
+            CreateWindowExW, DestroyWindow, HMENU, WINDOW_EX_STYLE, WINDOW_STYLE, WM_GETFONT,
+            WS_CHILD, WS_POPUP,
+        };
+
+        unsafe {
+            let make = |parent, style| {
+                CreateWindowExW(
+                    WINDOW_EX_STYLE::default(),
+                    w!("STATIC"),
+                    PCWSTR::null(),
+                    style,
+                    0,
+                    0,
+                    40,
+                    20,
+                    parent,
+                    Some(HMENU(0 as *mut core::ffi::c_void)),
+                    Some(crate::win32::view::instance()),
+                    None,
+                )
+                .expect("test window")
+            };
+            let parent = make(None, WS_POPUP);
+            let a = make(Some(parent), WINDOW_STYLE(WS_CHILD.0));
+            let b = make(Some(parent), WINDOW_STYLE(WS_CHILD.0));
+            let font = create(96);
+            assert!(!font.is_invalid(), "the UI font exists at 96 DPI");
+            set_children(parent, font);
+            for child in [a, b] {
+                let got = SendMessageW(child, WM_GETFONT, None, None).0;
+                assert_eq!(got, font.0 as isize, "every child carries the UI font");
+            }
+            let _ = DestroyWindow(a);
+            let _ = DestroyWindow(b);
+            let _ = DestroyWindow(parent);
+            let _ = DeleteObject(font.into());
         }
     }
 }

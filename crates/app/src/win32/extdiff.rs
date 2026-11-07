@@ -27,7 +27,9 @@
 use crate::win32::wstr::wide;
 use windows::core::{PCWSTR, PWSTR};
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, RECT, WPARAM};
-use windows::Win32::Graphics::Gdi::{CreateSolidBrush, DeleteObject, FillRect, HBRUSH, HDC};
+use windows::Win32::Graphics::Gdi::{
+    CreateSolidBrush, DeleteObject, FillRect, HBRUSH, HDC, HFONT,
+};
 use windows::Win32::UI::Controls::Dialogs::{
     GetOpenFileNameW, OFN_FILEMUSTEXIST, OFN_HIDEREADONLY, OPENFILENAMEW,
 };
@@ -223,6 +225,9 @@ struct Ctx {
     state: *mut EditorState,
     rows: Vec<String>,
     face: Face,
+    /// The UI font for the children; the template's 8 pt `DS_SETFONT` block
+    /// stays untouched because it is also the dialog-unit ruler.
+    font: HFONT,
 }
 
 /// Opens the box over the frame. The document list is read once at open; a
@@ -234,6 +239,7 @@ pub(super) fn open(state: &mut EditorState, hwnd: HWND) {
         state: state as *mut EditorState,
         rows,
         face: Face::new(&theme),
+        font: unsafe { crate::win32::uifont::create(crate::win32::uifont::window_dpi(hwnd)) },
     });
     let ptr = &mut *ctx as *mut Ctx;
     let tmpl = build_template(DLG_TITLE, DLG_STYLE, DLG_W, DLG_H, 0, ITEMS);
@@ -249,6 +255,7 @@ pub(super) fn open(state: &mut EditorState, hwnd: HWND) {
             Some(dialog_proc),
             LPARAM(ptr as isize),
         );
+        let _ = DeleteObject(ctx.font.into());
     }
 }
 
@@ -361,6 +368,9 @@ unsafe extern "system" fn dialog_proc(
         WM_INITDIALOG => {
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, lparam.0 as isize);
             let ctx = ctx(hwnd);
+            // The template's 8 pt font is the dialog-unit ruler, so only the
+            // children's text font is replaced.
+            crate::win32::uifont::set_children(hwnd, ctx.font);
             let theme = (*ctx.state).docs.act().theme.clone();
             localize_dialog(hwnd, 270);
             let dark = chrome::theme_is_dark(&theme);
@@ -430,6 +440,8 @@ unsafe extern "system" fn dialog_proc(
 struct CfgCtx {
     state: *mut EditorState,
     face: Face,
+    /// The UI font for the children of the 配置 box.
+    font: HFONT,
 }
 
 /// Opens 配置 over the 比较 box. 确认 writes `[Tool] DiffExe`/`DiffArgs`
@@ -439,6 +451,7 @@ fn config_dialog(owner: HWND, theme: &dg_render::Theme) {
         state: unsafe { cfg_state(owner) },
         // Fresh brushes: the 比较 box owns the ones its own face holds.
         face: Face::new(theme),
+        font: unsafe { crate::win32::uifont::create(crate::win32::uifont::window_dpi(owner)) },
     });
     let ptr = &mut *ctx as *mut CfgCtx;
     let tmpl = build_template(CFG_TITLE, DLG_STYLE, CFG_W, CFG_H, 0, CFG_ITEMS);
@@ -454,6 +467,7 @@ fn config_dialog(owner: HWND, theme: &dg_render::Theme) {
             Some(config_proc),
             LPARAM(ptr as isize),
         );
+        let _ = DeleteObject(ctx.font.into());
     }
 }
 
@@ -557,6 +571,7 @@ unsafe extern "system" fn config_proc(
         WM_INITDIALOG => {
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, lparam.0 as isize);
             let ctx = cfg_ctx(hwnd);
+            crate::win32::uifont::set_children(hwnd, ctx.font);
             let theme = (*ctx.state).docs.act().theme.clone();
             localize_dialog(hwnd, 271);
             let dark = chrome::theme_is_dark(&theme);

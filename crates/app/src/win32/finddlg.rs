@@ -25,8 +25,8 @@ use std::sync::atomic::{AtomicI32, AtomicIsize, Ordering};
 
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, POINT, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::{
-    ClientToScreen, CreateSolidBrush, DeleteObject, FillRect, FrameRect, HBRUSH, HDC, HGDIOBJ,
-    InvalidateRect, Polygon, SelectObject,
+    ClientToScreen, CreateSolidBrush, DeleteObject, FillRect, FrameRect, HBRUSH, HDC, HFONT,
+    HGDIOBJ, InvalidateRect, Polygon, SelectObject,
 };
 use windows::Win32::UI::Controls::{
     IsDlgButtonChecked, DRAWITEMSTRUCT, EM_GETSEL, EM_REPLACESEL, EM_SCROLLCARET, EM_SETSEL,
@@ -348,6 +348,9 @@ struct Inner {
     edge_brush: HBRUSH,
     ink_brush: HBRUSH,
     tip_host: Option<crate::win32::tiphost::TipHost>,
+    /// The UI font for the children; the template's 8 pt `DS_SETFONT` block
+    /// stays put because the dialog manager measures the layout with it.
+    font: HFONT,
 }
 
 unsafe fn state(hwnd: HWND) -> &'static mut Inner {
@@ -421,6 +424,9 @@ pub(super) fn show(frame: HWND, kind: Kind, model: &Model, theme: &Theme) {
         edge_brush: unsafe { CreateSolidBrush(to_colorref(theme.toolbar_border)) },
         ink_brush: unsafe { CreateSolidBrush(to_colorref(theme.toolbar_fg)) },
         tip_host: None,
+        font: unsafe {
+            crate::win32::uifont::create(crate::win32::uifont::window_dpi(frame))
+        },
     });
     let param = LPARAM(Box::into_raw(inner) as isize);
     let tmpl = template(kind);
@@ -436,7 +442,8 @@ pub(super) fn show(frame: HWND, kind: Kind, model: &Model, theme: &Theme) {
         Ok(h) => h,
         Err(_) => {
             unsafe {
-                drop(Box::from_raw(param.0 as *mut Inner));
+                let inner = Box::from_raw(param.0 as *mut Inner);
+                let _ = DeleteObject(inner.font.into());
             }
             return;
         }
@@ -1251,6 +1258,10 @@ unsafe extern "system" fn dialog_proc(
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, lparam.0 as isize);
             let st = state(hwnd);
             let kind = st.kind;
+            // Before anything measures a combo: the children's 8 pt template
+            // font becomes the UI font. `DS_SETFONT` itself stays, or every
+            // dialog-unit rect below would be rescaled.
+            crate::win32::uifont::set_children(hwnd, st.font);
             crate::win32::lang::localize_dialog(hwnd, kind.dialog_id());
             // Every combo starts with room for a dropdown list; the template's
             // 12-unit closed height is all a combo needs in a dialog unit box.
@@ -1470,6 +1481,7 @@ unsafe extern "system" fn dialog_proc(
             let _ = DeleteObject(ptr.press_brush.into());
             let _ = DeleteObject(ptr.edge_brush.into());
             let _ = DeleteObject(ptr.ink_brush.into());
+            let _ = DeleteObject(ptr.font.into());
             0
         }
         _ => 0,
