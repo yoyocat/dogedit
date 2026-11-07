@@ -23,8 +23,10 @@
 //!   当前快捷键 box are re-derived from the map each time.
 //! * **新建快捷键 is two fields**. Typing a combo in the first field hands the focus to
 //!   the second, and 分配 joins them with the comma the file uses. A row that cannot run
-//!   is a fact about the implementation worth showing: 分配 stays disabled for them, so
-//!   no dead binding can be created from here.
+//!   is a fact about the implementation worth showing: selecting one disables 分配, so
+//!   no dead binding can be created from here. With no row selected the buttons stay
+//!   enabled — the reference opens with all three bright, and the actions themselves
+//!   guard an empty selection.
 
 #![allow(unsafe_op_in_unsafe_fn)]
 
@@ -47,7 +49,7 @@ use windows::Win32::UI::Controls::{
     LVM_SETTEXTBKCOLOR, LVM_SETTEXTCOLOR, LVS_EX_FULLROWSELECT, LVS_NOCOLUMNHEADER, LVS_REPORT,
     LVS_SHOWSELALWAYS, LVS_SINGLESEL, LVN_ITEMCHANGED, NMHDR, NMLVCUSTOMDRAW, LVCF_WIDTH,
     LVIF_STATE,
-    DRAWITEMSTRUCT, LVS_EX_LABELTIP, LVM_ENSUREVISIBLE, LVM_SETITEMTEXTW,
+    LVS_EX_LABELTIP, LVM_ENSUREVISIBLE, LVM_SETITEMTEXTW,
     LIST_VIEW_ITEM_STATE_FLAGS, NM_CUSTOMDRAW,
 };
 use windows::Win32::UI::HiDpi::GetDpiForWindow;
@@ -57,14 +59,14 @@ use windows::Win32::UI::Shell::{
     SetWindowSubclass,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    BS_OWNERDRAW, CreateDialogIndirectParamW, CreateWindowExW, DLGTEMPLATE, DestroyWindow,
+    BS_PUSHBUTTON, CreateDialogIndirectParamW, CreateWindowExW, DLGTEMPLATE, DestroyWindow,
     GA_ROOT, GetAncestor, GetClientRect, GetDlgCtrlID, GetDlgItem, GetWindowLongPtrW, GetWindowTextW,
     GetWindowTextLengthW, GWLP_USERDATA, HMENU, IDCANCEL, IDYES, IsDialogMessageW, MB_YESNO, MSG,
     MessageBoxW, WM_SETFONT,
     PostMessageW, SWP_NOACTIVATE, SWP_NOZORDER, SendMessageW, SetWindowLongPtrW, SetWindowPos,
     SetWindowTextW, ShowWindow, SW_SHOW, WM_APP, WM_CHAR, WM_CLOSE, WM_COMMAND,
     WM_CTLCOLORBTN, WM_CTLCOLOREDIT, WM_CTLCOLORLISTBOX, WM_CTLCOLORSTATIC, WM_DESTROY,
-    GetWindowRect, SBS_SIZEBOX, SBS_SIZEBOXBOTTOMRIGHTALIGN, WM_DRAWITEM, WM_DROPFILES, WM_ERASEBKGND,
+    GetWindowRect, SBS_SIZEBOX, SBS_SIZEBOXBOTTOMRIGHTALIGN, WM_DROPFILES, WM_ERASEBKGND,
     WM_GETMINMAXINFO, WM_INITDIALOG, WM_KEYDOWN, WM_SETICON, ICON_BIG, ICON_SMALL,
     WM_NCDESTROY, WM_NOTIFY, WM_PAINT,
     WM_SYSCHAR, WM_SYSKEYDOWN, WM_SIZE, WS_CAPTION, WS_CHILD, WS_CLIPCHILDREN, WS_POPUP, WS_SYSMENU,
@@ -80,7 +82,7 @@ use crate::win32::customdraw;
 use crate::win32::ownerdraw;
 use crate::win32::view::instance;
 use crate::win32::window::{modifier_state, to_colorref};
-use dg_render::theme::{Theme, luma_blend};
+use dg_render::theme::Theme;
 
 /// Control ids
 const ID_FILTER: i32 = 1_200;
@@ -159,8 +161,6 @@ struct Dlg {
     font: HFONT,
     bg: HBRUSH,
     face: HBRUSH,
-    /// The button face under the cursor — one ink step over `face`.
-    face_hot: HBRUSH,
     edge: HBRUSH,
     dpi: f32,
     /// Every row, commands first in name order, then any dropped scripts.
@@ -183,30 +183,6 @@ unsafe fn state(dlg: HWND) -> &'static Dlg {
 
 unsafe fn state_mut(dlg: HWND) -> &'static mut Dlg {
     &mut *(GetWindowLongPtrW(dlg, GWLP_USERDATA) as *mut Dlg)
-}
-
-impl Dlg {
-    /// What [`ownerdraw`] needs to paint one of this dialog's buttons: the
-    /// pressed state brightens the label rather than the face, so `press` is
-    /// the resting face.
-    fn button_look(&self) -> ownerdraw::Look {
-        ownerdraw::Look {
-            face: self.face,
-            hot: self.face_hot,
-            press: self.face,
-            edge: ownerdraw::Edge::Square(self.edge),
-            ink: ownerdraw::Ink {
-                normal: to_colorref(self.theme.panel_fg),
-                pressed: to_colorref(self.theme.foreground),
-                disabled: to_colorref(self.theme.menu_disabled),
-            },
-            font: self.font,
-            under: None,
-            inset: 0,
-            press_offset: 0,
-            live_rect: false,
-        }
-    }
 }
 
 /// What the dialog needs when 1460 asks for it: the frame, the map to edit (a
@@ -270,11 +246,6 @@ unsafe fn create(req: Request<'_>, dpi: f32) {
         font: ui_font(dpi),
         bg: CreateSolidBrush(to_colorref(req.theme.background)),
         face: CreateSolidBrush(to_colorref(req.theme.panel_bg)),
-        face_hot: CreateSolidBrush(to_colorref(luma_blend(
-            req.theme.foreground,
-            req.theme.panel_bg,
-            0.08,
-        ))),
         edge: CreateSolidBrush(to_colorref(req.theme.indent_line)),
         dpi,
         rows: command_rows(),
@@ -451,19 +422,29 @@ unsafe fn build_children(dlg: HWND) {
         "",
         (WS_TABSTOP | WINDOW_STYLE(0x0080_0000)).0,
     );
-    // 1203 / 1202 / 1207 — 分配, 绑定脚本, 删除. Owner-drawn, because a themed
-    // BUTTON would keep the system's light palette.
-    add(ID_ASSIGN, w!("Button"), "分配", WS_TABSTOP.0 | BS_OWNERDRAW as u32);
+    // 1203 / 1202 / 1207 — 分配, 绑定脚本, 删除. Native push buttons, exactly
+    // as DLG 210 declares them. `create` names them `DarkMode_Explorer`, so the
+    // visual style draws the dark rounded face, the centred caption and the
+    // hover/pressed states; painting them here would lose all three. `add`
+    // also gives them the dialog's UI font, like every other child.
+    add(
+        ID_ASSIGN,
+        w!("Button"),
+        "分配",
+        WS_TABSTOP.0 | BS_PUSHBUTTON as u32,
+    );
     add(
         ID_BIND_SCRIPT,
         w!("Button"),
         "绑定脚本",
-        WS_TABSTOP.0 | BS_OWNERDRAW as u32,
+        WS_TABSTOP.0 | BS_PUSHBUTTON as u32,
     );
-    add(ID_DELETE, w!("Button"), "删除", WS_TABSTOP.0 | BS_OWNERDRAW as u32);
-    // The three above are the only owner-drawn controls here; they get the
-    // hover subclass every owner-drawn button needs (see [`ownerdraw`]).
-    ownerdraw::install(dlg, &[ID_ASSIGN, ID_BIND_SCRIPT, ID_DELETE]);
+    add(
+        ID_DELETE,
+        w!("Button"),
+        "删除",
+        WS_TABSTOP.0 | BS_PUSHBUTTON as u32,
+    );
     // The template's size grip: a `ScrollBar` that draws the corner hatch and
     // turns a drag on it into a `WM_SIZING` for the dialog.
     add(
@@ -483,10 +464,6 @@ unsafe fn build_children(dlg: HWND) {
                 dlg.0 as usize,
             );
         }
-    }
-    // Nothing is selected yet, so 删除 has nothing to delete.
-    if let Some(del) = item(dlg, ID_DELETE) {
-        let _ = EnableWindow(del, false);
     }
 }
 
@@ -705,9 +682,9 @@ unsafe fn refresh_current(dlg: HWND) {
         if let Some(lb) = item(dlg, ID_CURRENT) {
             let _ = SendMessageW(lb, LB_RESETCONTENT, None, None);
         }
-        set_enabled(dlg, ID_ASSIGN, false);
-        set_enabled(dlg, ID_BIND_SCRIPT, false);
-        set_enabled(dlg, ID_DELETE, false);
+        set_enabled(dlg, ID_ASSIGN, true);
+        set_enabled(dlg, ID_BIND_SCRIPT, true);
+        set_enabled(dlg, ID_DELETE, true);
         return;
     };
     let combos = st.map.combos_for(&row.value);
@@ -1053,33 +1030,6 @@ unsafe fn on_custom_draw(dlg: HWND, lparam: LPARAM) -> isize {
     })
 }
 
-/// A button, every pixel of it, from `Theme` — the same trade `markdlg` makes:
-/// a themed `BUTTON` keeps the system's palette and the dialog would be the only
-/// light one in the application. The pixels themselves come from
-/// [`ownerdraw`], which is also what gives the button its hover state.
-unsafe fn on_draw_item(dlg: HWND, lparam: LPARAM) -> isize {
-    let di = &*(lparam.0 as *const DRAWITEMSTRUCT);
-    let id = di.CtlID as i32;
-    let Some(label) = BUTTONS.iter().find(|(b, _)| *b == id).map(|(_, l)| *l) else {
-        return 0;
-    };
-    let label = crate::win32::lang::dlg(210, id as u32)
-        .or_else(|| crate::win32::lang::tr(label))
-        .unwrap_or(label);
-    let st = state(dlg);
-    let look = st.button_look();
-    let rc = ownerdraw::frame(di, &look);
-    // Left-aligned against the face's own edge
-    ownerdraw::label(di, rc, &look, label, ownerdraw::Align::Left(0));
-    1
-}
-
-const BUTTONS: [(i32, &str); 3] = [
-    (ID_ASSIGN, "分配"),
-    (ID_BIND_SCRIPT, "绑定脚本"),
-    (ID_DELETE, "删除"),
-];
-
 /// The header band: four captions on the dialog's face
 /// separators. Painted here because the list's own header cannot be re-coloured.
 unsafe fn paint_header(dlg: HWND, hdc: HDC) {
@@ -1277,7 +1227,6 @@ unsafe extern "system" fn dialog_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lpar
         }
         WM_COMMAND => on_command(hwnd, wparam),
         WM_NOTIFY => on_notify(hwnd, lparam),
-        WM_DRAWITEM => on_draw_item(hwnd, lparam),
         WM_SIZE => {
             let w = (lparam.0 & 0xFFFF) as i32;
             let h = ((lparam.0 >> 16) & 0xFFFF) as i32;
@@ -1323,6 +1272,9 @@ unsafe extern "system" fn dialog_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lpar
                 st.bg,
             )
         }
+        // The statics need this arm. A themed push button ignores it — the
+        // visual style owns its face and caption — and an unthemed one only
+        // takes the dialog's background brush from it.
         WM_CTLCOLORSTATIC | WM_CTLCOLORBTN => {
             let st = state(hwnd);
             let ctl = HWND(lparam.0 as *mut core::ffi::c_void);
@@ -1368,7 +1320,6 @@ unsafe extern "system" fn dialog_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lpar
                 let _ = DeleteObject(HGDIOBJ(b.font.0));
                 let _ = DeleteObject(HGDIOBJ(b.bg.0));
                 let _ = DeleteObject(HGDIOBJ(b.face.0));
-                let _ = DeleteObject(HGDIOBJ(b.face_hot.0));
                 let _ = DeleteObject(HGDIOBJ(b.edge.0));
             }
             0
@@ -1449,6 +1400,41 @@ mod tests {
     fn columns_are_the_measured_widths() {
         assert_eq!(COLUMNS, [59, 144, 120, 160]);
         assert!(COLUMNS.iter().sum::<i32>() < CLIENT_W - 2 * MARGIN);
+    }
+
+    /// The three buttons must stay native `BS_PUSHBUTTON` controls. DLG 210
+    /// declares them that way, and the visual style is what draws the rounded
+    /// dark face, the centred caption and the hover/pressed states. A source
+    /// scan, because `build_children` needs a live dialog with a valid
+    /// `GWLP_USERDATA` state; the strings below are exactly the hooks a return
+    /// to parent-painted buttons would need.
+    #[test]
+    fn the_three_buttons_stay_native_push_buttons() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("src/win32/shortcutdlg.rs");
+        let src = std::fs::read_to_string(&path).expect("shortcutdlg.rs");
+        let body = src.split("mod tests {").next().unwrap();
+        for gone in [
+            "BS_OWNERDRAW",
+            "WM_DRAWITEM",
+            "ownerdraw::install",
+            "face_hot",
+            "button_look",
+        ] {
+            assert!(
+                !body.contains(gone),
+                "{gone} would put the buttons back under this dialog's own paint"
+            );
+        }
+        assert_eq!(
+            body.matches("BS_PUSHBUTTON as u32").count(),
+            3,
+            "one push-button style per button"
+        );
+        assert!(
+            body.contains("dark_theme_children"),
+            "the visual style needs its dark sub-app name"
+        );
     }
 
     /// Every listed command has a name.
