@@ -257,7 +257,7 @@ dependencies = [
 
 [[package]]
 name = "dg-app"
-version = "0.1.0"
+version = "0.1.5"
 dependencies = [
  "core-graphics",
  "core-text",
@@ -291,7 +291,7 @@ dependencies = [
 
 [[package]]
 name = "dg-core"
-version = "0.1.0"
+version = "0.1.5"
 dependencies = [
  "bitflags 2.13.2",
  "crossbeam-channel",
@@ -305,11 +305,11 @@ dependencies = [
 
 [[package]]
 name = "dg-hex"
-version = "0.1.0"
+version = "0.1.5"
 
 [[package]]
 name = "dg-large"
-version = "0.1.0"
+version = "0.1.5"
 dependencies = [
  "chardetng",
  "crossbeam-channel",
@@ -322,14 +322,14 @@ dependencies = [
 
 [[package]]
 name = "dg-layout"
-version = "0.1.0"
+version = "0.1.5"
 dependencies = [
  "dg-core",
 ]
 
 [[package]]
 name = "dg-lsp"
-version = "0.1.0"
+version = "0.1.5"
 dependencies = [
  "crossbeam-channel",
  "dg-core",
@@ -341,11 +341,11 @@ dependencies = [
 
 [[package]]
 name = "dg-paint"
-version = "0.1.0"
+version = "0.1.5"
 
 [[package]]
 name = "dg-render"
-version = "0.1.0"
+version = "0.1.5"
 dependencies = [
  "dg-core",
  "dg-layout",
@@ -354,7 +354,7 @@ dependencies = [
 
 [[package]]
 name = "dg-script"
-version = "0.1.0"
+version = "0.1.5"
 dependencies = [
  "dg-render",
  "dg-skin",
@@ -365,14 +365,14 @@ dependencies = [
 
 [[package]]
 name = "dg-skin"
-version = "0.1.0"
+version = "0.1.5"
 dependencies = [
  "dg-render",
 ]
 
 [[package]]
 name = "dg-syntax"
-version = "0.1.0"
+version = "0.1.5"
 dependencies = [
  "dg-paint",
  "libloading",
@@ -389,7 +389,7 @@ dependencies = [
 
 [[package]]
 name = "dg-ui"
-version = "0.1.0"
+version = "0.1.5"
 dependencies = [
  "dg-core",
  "dg-render",
@@ -471,7 +471,7 @@ checksum = "1c66915cc5391097de7a2b0b972e8505aa33c0df401fd3a6811dbdb32881ba48"
 
 [[package]]
 name = "fixture-json-dll"
-version = "0.1.0"
+version = "0.1.5"
 dependencies = [
  "tree-sitter-json",
  "tree-sitter-language",

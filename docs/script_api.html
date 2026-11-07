@@ -145,7 +145,7 @@ tr:nth-child(even) td{background:var(--zebra)}
 <tr><td>Lua 语言版本</td><td>5.4</td><td><code>_VERSION</code></td></tr>
 <tr><td>脚本 API 版本</td><td><code>"0.2"</code></td><td><code>App.version()</code></td></tr>
 <tr><td>包清单格式版本</td><td><code>api = 1</code>(唯一被接受的值)</td><td>—</td></tr>
-<tr><td>宿主版本</td><td>程序版本号(当前 0.1.0)</td><td><code>requires = ["dogedit &gt;= …"]</code> 拿它比</td></tr>
+<tr><td>宿主版本</td><td>程序版本号(当前 0.1.5)</td><td><code>requires = ["dogedit &gt;= …"]</code> 拿它比</td></tr>
 </table>
 <p class="lead" style="margin-top:18px">所有行为均按当前开发版源码整理;尚未接线的功能在文中用 <span class="badge na">尚未触发</span> 一类徽标如实标注。</p>
 </section>
@@ -872,7 +872,7 @@ scripts = ["paint.lua", "panels.lua"]  # 可省;缺省 = 目录下所有 *.lua �
 <li><code>scripts</code> 必须是包目录内的相对路径,不许跳出;写了就按写的顺序跑,<b>哪些文件会跑是个能打印出来的事实</b>。</li>
 <li><code>launch</code> 必须是非空字符串。空串、纯空白、布尔、数字一律<b>报错</b>,不静默退回「开机装载」—— 作者以为关掉了自动装载、结果脚本照跑是最难查的一种。值里的 <code>&amp;</code> 是菜单加速键。</li>
 <li>清单里写 <code>kind</code> / <code>facets</code> / <code>permissions</code> 会<b>报错</b>而不是忽略:包不分级,什么脚本都能建元素、画画、改文档;真正的约束在回调签名上(画法必须纯、点击回调返回意图)。</li>
-<li><code>requires</code> 里的 <code>dogedit</code> 指宿主本身,版本就是程序版本(当前 0.1.0);被依赖包缺了或版本不够,这个包装不上,原因会写进管理器与 <code>--packages</code> 报告。</li>
+<li><code>requires</code> 里的 <code>dogedit</code> 指宿主本身,版本就是程序版本(当前 0.1.5);被依赖包缺了或版本不够,这个包装不上,原因会写进管理器与 <code>--packages</code> 报告。</li>
 <li>单个脚本文件失败<b>不带走整包</b>:后面的文件可能正是补它的那个。</li>
 </ul>
 
