@@ -11,11 +11,20 @@
 //!   size: the search field and the list grow with the width, the list grows with the
 //!   height, and the whole bottom block (hint, labels, current-key list, fields,
 //!   buttons) rides the height delta.
-//! * **The four columns** are 按键 / ID / 命令 / 说明, 59/144/120/160 px wide. The
-//!   header is painted by this module rather than by the list view: a themed
-//!   `SysHeader32` would keep the system's light palette, while this header is the
-//!   dialog's own `#2D2D2D` with `#E0E0E0` text. The list therefore carries
+//! * **The four columns** start at 按键 / ID / 命令 / 说明, 59/144/120/160 px wide,
+//!   and all four dividers are draggable — including the last column's right
+//!   edge, which is a handle in its own right and not merely the band's end.
+//!   A native `SysHeader32` would do that for free, but it keeps the system's
+//!   light palette; this header is the dialog's own `#2D2D2D` with `#E0E0E0`
+//!   text, so [`divider_at`] hit-tests the band and [`drag_divider`] pushes each
+//!   new width into both the band and the list's real columns with
+//!   `LVM_SETCOLUMNWIDTH`. The list carries
 //!   `LVS_NOCOLUMNHEADER` and starts under the band this module draws.
+//! * **The corner grip** is the template's `ScrollBar` `SBS_SIZEBOX`, kept because
+//!   it is what turns a drag at the corner into a resize. [`grip_proc`] takes over
+//!   only its erase and paint — the control's `COLOR_BTNFACE` square reads as a
+//!   light block on the dark dialog — and forwards every mouse message, so the
+//!   corner's `SC_SIZE` answer survives.
 //! * **The model** is `key.ini`'s `[Shortcut]` section, held as [`KeyMap::rows`] — the
 //!   rows as the file spells them. 分配 rewrites one row, 删除 drops one, and every
 //!   store writes the section back and posts [`WM_SHORTCUTS`] so the frame reloads the
@@ -36,42 +45,44 @@ use std::sync::atomic::{AtomicIsize, Ordering};
 
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::{
-    CLEARTYPE_QUALITY, CLIP_DEFAULT_PRECIS, CreateFontW, CreateSolidBrush,
-    ScreenToClient,
-    DEFAULT_CHARSET, DEFAULT_PITCH, DeleteObject, BeginPaint, EndPaint, FillRect, FrameRect, HBRUSH,
-    HDC, HFONT, HGDIOBJ, InvalidateRect,
-    OUT_DEFAULT_PRECIS, PAINTSTRUCT, SetBkMode, TRANSPARENT,
+    BeginPaint, CLEARTYPE_QUALITY, CLIP_DEFAULT_PRECIS, CreateFontW, CreateSolidBrush,
+    DEFAULT_CHARSET, DEFAULT_PITCH, DeleteObject, EndPaint, FillRect, FrameRect, HBRUSH, HDC,
+    HFONT, HGDIOBJ, InvalidateRect, OUT_DEFAULT_PRECIS, PAINTSTRUCT, RDW_ALLCHILDREN, RDW_ERASE,
+    RDW_INVALIDATE, RDW_UPDATENOW, RedrawWindow, ScreenToClient, SetBkMode, TRANSPARENT,
+    UpdateWindow,
 };
 use windows::Win32::UI::Controls::{
-    ICC_BAR_CLASSES, INITCOMMONCONTROLSEX, InitCommonControlsEx, LVCOLUMNW, LVIF_PARAM, LVIF_TEXT,
-    LVIS_FOCUSED, LVIS_SELECTED, LVITEMW, LVM_DELETEALLITEMS, LVM_INSERTCOLUMNW,
-    LVM_INSERTITEMW, LVM_SETBKCOLOR, LVM_SETEXTENDEDLISTVIEWSTYLE, LVM_SETITEMSTATE,
-    LVM_SETTEXTBKCOLOR, LVM_SETTEXTCOLOR, LVS_EX_FULLROWSELECT, LVS_NOCOLUMNHEADER, LVS_REPORT,
-    LVS_SHOWSELALWAYS, LVS_SINGLESEL, LVN_ITEMCHANGED, NMHDR, NMLVCUSTOMDRAW, LVCF_WIDTH,
-    LVIF_STATE,
-    LVS_EX_LABELTIP, LVM_ENSUREVISIBLE, LVM_SETITEMTEXTW,
-    LIST_VIEW_ITEM_STATE_FLAGS, NM_CUSTOMDRAW,
+    ICC_BAR_CLASSES, INITCOMMONCONTROLSEX, InitCommonControlsEx, LIST_VIEW_ITEM_STATE_FLAGS,
+    LVCF_WIDTH, LVCOLUMNW, LVIF_PARAM, LVIF_STATE, LVIF_TEXT, LVIS_FOCUSED, LVIS_SELECTED,
+    LVITEMW, LVM_DELETEALLITEMS, LVM_ENSUREVISIBLE, LVM_INSERTCOLUMNW, LVM_INSERTITEMW,
+    LVM_SETBKCOLOR, LVM_SETCOLUMNWIDTH, LVM_SETEXTENDEDLISTVIEWSTYLE, LVM_SETITEMSTATE,
+    LVM_SETITEMTEXTW, LVM_SETTEXTBKCOLOR, LVM_SETTEXTCOLOR, LVS_EX_FULLROWSELECT,
+    LVS_EX_LABELTIP, LVS_NOCOLUMNHEADER, LVS_REPORT, LVS_SHOWSELALWAYS, LVS_SINGLESEL,
+    LVN_ITEMCHANGED, NM_CUSTOMDRAW, NMHDR, NMLVCUSTOMDRAW,
 };
 use windows::Win32::UI::HiDpi::GetDpiForWindow;
-use windows::Win32::UI::Input::KeyboardAndMouse::{EnableWindow, SetFocus};
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    EnableWindow, ReleaseCapture, SetCapture, SetFocus,
+};
 use windows::Win32::UI::Shell::{
     DefSubclassProc, DragAcceptFiles, DragFinish, DragQueryFileW, HDROP, RemoveWindowSubclass,
     SetWindowSubclass,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_PUSHBUTTON, CreateDialogIndirectParamW, CreateWindowExW, DLGTEMPLATE, DestroyWindow,
-    GA_ROOT, GetAncestor, GetClientRect, GetDlgCtrlID, GetDlgItem, GetWindowLongPtrW, GetWindowTextW,
-    GetWindowTextLengthW, GWLP_USERDATA, HMENU, IDCANCEL, IDYES, IsDialogMessageW, MB_YESNO, MSG,
-    MessageBoxW, WM_SETFONT,
-    PostMessageW, SWP_NOACTIVATE, SWP_NOZORDER, SendMessageW, SetWindowLongPtrW, SetWindowPos,
-    SetWindowTextW, ShowWindow, SW_SHOW, WM_APP, WM_CHAR, WM_CLOSE, WM_COMMAND,
-    WM_CTLCOLORBTN, WM_CTLCOLOREDIT, WM_CTLCOLORLISTBOX, WM_CTLCOLORSTATIC, WM_DESTROY,
-    GetWindowRect, SBS_SIZEBOX, SBS_SIZEBOXBOTTOMRIGHTALIGN, WM_DROPFILES, WM_ERASEBKGND,
-    WM_GETMINMAXINFO, WM_INITDIALOG, WM_KEYDOWN, WM_SETICON, ICON_BIG, ICON_SMALL,
-    WM_NCDESTROY, WM_NOTIFY, WM_PAINT,
-    WM_SYSCHAR, WM_SYSKEYDOWN, WM_SIZE, WS_CAPTION, WS_CHILD, WS_CLIPCHILDREN, WS_POPUP, WS_SYSMENU,
-    WS_TABSTOP, WS_THICKFRAME, WS_VISIBLE, WINDOW_EX_STYLE, WINDOW_STYLE, LB_ADDSTRING,
-    LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, MINMAXINFO,
+    GA_ROOT, GetAncestor, GetClientRect, GetCursorPos, GetDlgCtrlID, GetDlgItem, GetWindowLongPtrW,
+    GetWindowRect, GetWindowTextLengthW, GetWindowTextW, GWLP_USERDATA, HMENU, HTCLIENT,
+    IDC_SIZEWE, IDCANCEL, ICON_BIG, ICON_SMALL, IDYES, IsDialogMessageW, LB_ADDSTRING,
+    LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LoadCursorW, MB_YESNO, MessageBoxW, MINMAXINFO,
+    MSG, PostMessageW, SBS_SIZEBOX, SBS_SIZEBOXBOTTOMRIGHTALIGN, SendMessageW, SetCursor,
+    SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow, SW_SHOW, SWP_NOACTIVATE,
+    SWP_NOCOPYBITS, SWP_NOZORDER, WINDOW_EX_STYLE, WINDOW_STYLE, WM_APP, WM_CAPTURECHANGED,
+    WM_CHAR, WM_CLOSE, WM_COMMAND, WM_CTLCOLORBTN, WM_CTLCOLOREDIT, WM_CTLCOLORLISTBOX,
+    WM_CTLCOLORSTATIC, WM_DESTROY, WM_DROPFILES, WM_ERASEBKGND, WM_GETMINMAXINFO,
+    WM_INITDIALOG, WM_KEYDOWN, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEMOVE, WM_NCDESTROY,
+    WM_NOTIFY, WM_PAINT, WM_SETCURSOR, WM_SETFONT, WM_SETICON, WM_SIZE, WM_SYSCHAR,
+    WM_SYSKEYDOWN, WS_CAPTION, WS_CHILD, WS_CLIPCHILDREN, WS_POPUP, WS_SYSMENU, WS_TABSTOP,
+    WS_THICKFRAME, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -98,6 +109,8 @@ const ID_L_NEW: i32 = 3_001;
 const ID_HINT: i32 = 3_002;
 /// The template's 21x21 size grip, the `ScrollBar` at the corner.
 const ID_GRIP: i32 = 3_003;
+/// Subclass id for the grip's own paint.
+const GRIP_SUBCLASS: usize = 2;
 
 /// The dialog's client at 96 DPI: 438x326 dialog units at 1.4 x / 1.6 y.
 const CLIENT_W: i32 = 613;
@@ -112,6 +125,10 @@ const LIST_H: i32 = 328 - HEADER_H;
 /// 按键 / ID / 命令 / 说明
 const COLUMNS: [i32; 4] = [59, 144, 120, 160];
 const HEADER_CAPTIONS: [&str; 4] = ["按键", "ID", "命令", "说明"];
+/// A column cannot be dragged narrower than this, and a divider is grabbed
+/// within this many logical pixels of its edge.
+const MIN_COL_W: i32 = 40;
+const DIVIDER_HIT_W: i32 = 4;
 
 /// The hint line's red. The.lng string carries no colour and the dialog has no
 /// `Theme` field for a warning.
@@ -162,6 +179,8 @@ struct Dlg {
     bg: HBRUSH,
     face: HBRUSH,
     edge: HBRUSH,
+    /// The grip's dots, in the theme's divider colour.
+    grip_dot: HBRUSH,
     dpi: f32,
     /// Every row, commands first in name order, then any dropped scripts.
     rows: Vec<Row>,
@@ -175,6 +194,18 @@ struct Dlg {
     /// Set while the list is being filled: the control reports a selection
     /// change for every inserted item, and those are not the user's.
     loading: bool,
+    /// The four column widths in device pixels. The header band is ours, so
+    /// dragging a divider moves both this and the list's real columns.
+    cols: [i32; 4],
+    /// The divider being dragged, if any.
+    drag: Option<HeaderDrag>,
+}
+
+#[derive(Clone, Copy)]
+struct HeaderDrag {
+    index: usize,
+    start_x: i32,
+    start_w: i32,
 }
 
 unsafe fn state(dlg: HWND) -> &'static Dlg {
@@ -247,12 +278,15 @@ unsafe fn create(req: Request<'_>, dpi: f32) {
         bg: CreateSolidBrush(to_colorref(req.theme.background)),
         face: CreateSolidBrush(to_colorref(req.theme.panel_bg)),
         edge: CreateSolidBrush(to_colorref(req.theme.indent_line)),
+        grip_dot: CreateSolidBrush(to_colorref(req.theme.statusbar_divider)),
         dpi,
         rows: command_rows(),
         shown: Vec::new(),
         sel: -1,
         current: Vec::new(),
         loading: false,
+        cols: COLUMNS.map(|w| scale(w, dpi)),
+        drag: None,
     });
     let param = LPARAM(Box::into_raw(boxed) as isize);
     let dlg = match CreateDialogIndirectParamW(
@@ -446,13 +480,23 @@ unsafe fn build_children(dlg: HWND) {
         WS_TABSTOP.0 | BS_PUSHBUTTON as u32,
     );
     // The template's size grip: a `ScrollBar` that draws the corner hatch and
-    // turns a drag on it into a `WM_SIZING` for the dialog.
-    add(
+    // turns a drag on it into a `SC_SIZE` for the dialog. Its own paint uses the
+    // system button face, so the square reads as a light block on a dark dialog;
+    // the subclass answers only the paint and leaves resizing to the control.
+    let grip = add(
         ID_GRIP,
         w!("ScrollBar"),
         "",
         (SBS_SIZEBOX | SBS_SIZEBOXBOTTOMRIGHTALIGN) as u32,
     );
+    if let Some(grip) = grip {
+        let _ = SetWindowSubclass(
+            grip,
+            Some(grip_proc),
+            GRIP_SUBCLASS,
+            dlg.0 as usize,
+        );
+    }
 
     // The two key fields capture key presses instead of typing text.
     for id in [ID_KEY1, ID_KEY2] {
@@ -485,7 +529,7 @@ unsafe fn layout(dlg: HWND, w: i32, h: i32) {
                 y,
                 cw.max(1),
                 ch.max(1),
-                SWP_NOZORDER | SWP_NOACTIVATE,
+                SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOCOPYBITS,
             );
         }
     };
@@ -507,10 +551,25 @@ unsafe fn layout(dlg: HWND, w: i32, h: i32) {
     place(ID_BIND_SCRIPT, px(235), px(462) + dh, px(70), px(22));
     place(ID_DELETE, px(8), px(488) + dh, px(70), px(22));
     place(ID_GRIP, w - px(21), h - px(21), px(21), px(21));
-    let _ = InvalidateRect(Some(dlg), None, true);
+    // The dialog carries `WS_CLIPCHILDREN`: invalidating only the parent
+    // leaves every child's rectangle untouched, so the old borders and
+    // captions stay on the face and a moved control keeps the half-bitmap
+    // `SetWindowPos` would otherwise copy across. Repaint the whole subtree
+    // synchronously — `RDW_ERASE` clears the rectangles they vacated,
+    // `RDW_ALLCHILDREN` reaches the statics/edits/buttons that do not
+    // redraw on a move, `RDW_UPDATENOW` puts it on screen before the next
+    // WM_SIZE. `grepdlg`'s layout does the same for the same reason.
+    let _ = RedrawWindow(
+        Some(dlg),
+        None,
+        None,
+        RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW,
+    );
 }
 
-/// The list's own setup: four fixed columns, the theme's colours.
+/// The list's own setup: four columns from [`Dlg::cols`], the theme's colours.
+/// `cols` is the one source of truth — the painted header reads it, a divider
+/// drag writes it, and this pushes it into comctl32.
 unsafe fn init_list(dlg: HWND) {
     let Some(list) = item(dlg, ID_LIST) else {
         return;
@@ -523,10 +582,10 @@ unsafe fn init_list(dlg: HWND) {
         Some(WPARAM(ex)),
         Some(LPARAM(ex as isize)),
     );
-    for (i, w) in COLUMNS.iter().enumerate() {
+    for (i, w) in st.cols.iter().enumerate() {
         let mut col = LVCOLUMNW {
             mask: LVCF_WIDTH,
-            cx: scale(*w, st.dpi),
+            cx: *w,
             ..Default::default()
         };
         let _ = SendMessageW(
@@ -1048,7 +1107,7 @@ unsafe fn paint_header(dlg: HWND, hdc: HDC) {
     let mut x = band.left;
     for (i, caption) in HEADER_CAPTIONS.iter().enumerate() {
         let caption = crate::win32::lang::trs(caption);
-        let w = scale(COLUMNS[i], st.dpi);
+        let w = st.cols[i];
         let cell = RECT {
             left: x + scale(6, st.dpi),
             top,
@@ -1064,7 +1123,10 @@ unsafe fn paint_header(dlg: HWND, hdc: HDC) {
             ownerdraw::Align::Left(0),
         );
         x += w;
-        if i + 1 < HEADER_CAPTIONS.len() {
+        // Every column gets a right edge, last one included: that fourth line
+        // *is* the handle that resizes 说明. Stop at the band's own right edge
+        // so a column dragged to its limit does not paint past the frame.
+        if x < band.right {
             let line = RECT {
                 left: x,
                 top,
@@ -1106,6 +1168,211 @@ unsafe fn paint_header(dlg: HWND, hdc: HDC) {
             };
             FrameRect(hdc, &frame, st.edge);
         }
+    }
+}
+
+/// The x of divider `i` in the dialog's client pixels. Pure, so the hit test
+/// can be checked without a live window; [`paint_header`] draws its separators
+/// at exactly these positions (`band.left` is the same `scale(MARGIN, dpi)`).
+fn divider_x(cols: &[i32; 4], dpi: f32, i: usize) -> i32 {
+    scale(MARGIN, dpi) + cols[..=i].iter().sum::<i32>()
+}
+
+/// Which divider the pointer can grab, if any. Only the band's own strip is
+/// live: below it the list owns the mouse, above it the filter field does.
+fn divider_at(cols: &[i32; 4], dpi: f32, pt: POINT) -> Option<usize> {
+    let top = scale(HEADER_TOP, dpi);
+    if pt.y < top || pt.y >= top + scale(HEADER_H, dpi) {
+        return None;
+    }
+    let hit = scale(DIVIDER_HIT_W, dpi).max(2);
+    // Four columns, four handles. The last one is the right edge of 说明, not
+    // the band's right edge — the space beyond it is the grip-free remainder
+    // of the header strip, and dragging changes only that last column.
+    (0..cols.len()).find(|&i| (pt.x - divider_x(cols, dpi, i)).abs() <= hit)
+}
+
+/// A mouse message's client coordinates, unpacked from lparam. The two words
+/// are *signed* 16-bit values: during a capture the pointer can be outside the
+/// client. Reading them from the message (rather than `GetCursorPos`) is also
+/// what makes the drag reachable from a synthetic `PostMessage` probe.
+fn point_of(lparam: LPARAM) -> POINT {
+    POINT {
+        x: (lparam.0 & 0xFFFF) as u16 as i16 as i32,
+        y: ((lparam.0 >> 16) & 0xFFFF) as u16 as i16 as i32,
+    }
+}
+
+/// Hover only: `WM_SETCURSOR` carries a hit-test code in its lparam, not a
+/// position, so the live pointer is the one source for the cursor shape. The
+/// drag itself never depends on this — its coordinates come from the message.
+unsafe fn cursor_in(dlg: HWND) -> POINT {
+    let mut pt = POINT::default();
+    let _ = GetCursorPos(&mut pt);
+    let _ = ScreenToClient(dlg, &mut pt);
+    pt
+}
+
+unsafe fn on_lbutton_down(dlg: HWND, lparam: LPARAM) -> isize {
+    let pt = point_of(lparam);
+    let st = state(dlg);
+    let Some(index) = divider_at(&st.cols, st.dpi, pt) else {
+        return 0;
+    };
+    let start_w = st.cols[index];
+    state_mut(dlg).drag = Some(HeaderDrag {
+        index,
+        start_x: pt.x,
+        start_w,
+    });
+    // Without the capture a drag that leaves the band would stop arriving.
+    let _ = SetCapture(dlg);
+    1
+}
+
+unsafe fn on_lbutton_up(dlg: HWND) -> isize {
+    if state(dlg).drag.is_none() {
+        return 0;
+    }
+    state_mut(dlg).drag = None;
+    let _ = ReleaseCapture();
+    1
+}
+
+unsafe fn on_mouse_move(dlg: HWND, lparam: LPARAM) -> isize {
+    if state(dlg).drag.is_some() {
+        drag_divider(dlg, point_of(lparam).x);
+        1
+    } else {
+        0
+    }
+}
+
+/// Repaint only the band, synchronously, so the divider follows the pointer
+/// without waiting for the next input message. `WS_CLIPCHILDREN` is no obstacle
+/// here: the band is the parent's own strip, no child covers it.
+unsafe fn invalidate_header(dlg: HWND) {
+    let st = state(dlg);
+    let mut client = RECT::default();
+    let _ = GetClientRect(dlg, &mut client);
+    let band = RECT {
+        left: scale(MARGIN, st.dpi),
+        top: scale(HEADER_TOP, st.dpi),
+        right: client.right - scale(MARGIN, st.dpi),
+        bottom: scale(HEADER_TOP + HEADER_H, st.dpi) + 1,
+    };
+    let _ = InvalidateRect(Some(dlg), Some(&band), true);
+    let _ = UpdateWindow(dlg);
+}
+
+/// One drag step. The painted band and comctl32's columns have to move
+/// together: the list draws its own vertical separators from the latter, so
+/// writing only `cols` would leave the header sliding over stationary data.
+unsafe fn drag_divider(dlg: HWND, x: i32) {
+    let Some(d) = state(dlg).drag else {
+        return;
+    };
+    let st = state(dlg);
+    let min = scale(MIN_COL_W, st.dpi);
+    let margin = scale(MARGIN, st.dpi);
+    let mut client = RECT::default();
+    let _ = GetClientRect(dlg, &mut client);
+    // A divider may not pass the band's right edge: `divider_x` is
+    // margin + widths[..=index], and the band ends at client.right - margin.
+    // For the last column this keeps its handle on screen instead of letting
+    // the column grow out under the dialog border.
+    let used_before: i32 = st.cols[..d.index].iter().sum();
+    let max = (client.right - 2 * margin - used_before).max(min);
+    let w = (d.start_w + x - d.start_x).clamp(min, max);
+    if w == st.cols[d.index] {
+        return;
+    }
+    state_mut(dlg).cols[d.index] = w;
+    if let Some(list) = item(dlg, ID_LIST) {
+        let _ = SendMessageW(
+            list,
+            LVM_SETCOLUMNWIDTH,
+            Some(WPARAM(d.index)),
+            Some(LPARAM(w as isize)),
+        );
+    }
+    invalidate_header(dlg);
+}
+
+/// `WM_SETCURSOR` is the only place a cursor sticks: `SetCursor` from
+/// `WM_MOUSEMOVE` is overwritten by the default class cursor on the next move.
+unsafe fn on_set_cursor(dlg: HWND, wparam: WPARAM, lparam: LPARAM) -> isize {
+    if wparam.0 as isize != dlg.0 as isize || (lparam.0 & 0xFFFF) as u32 != HTCLIENT {
+        return 0;
+    }
+    let st = state(dlg);
+    if st.drag.is_some() || divider_at(&st.cols, st.dpi, cursor_in(dlg)).is_some() {
+        let cursor = LoadCursorW(None, IDC_SIZEWE).unwrap_or_default();
+        let _ = SetCursor(Some(cursor));
+        return 1;
+    }
+    0
+}
+
+/// The grip's own paint: the dialog face and the same three-row dot triangle
+/// `statusbar::draw_grip` uses, in the theme's divider colour.
+unsafe fn paint_grip(dlg: HWND, grip: HWND, hdc: HDC) {
+    let st = state(dlg);
+    let mut rc = RECT::default();
+    if GetClientRect(grip, &mut rc).is_err() || rc.right <= 0 || rc.bottom <= 0 {
+        return;
+    }
+    let _ = FillRect(hdc, &rc, st.bg);
+    let dot = scale(1, st.dpi).max(1);
+    let pitch = dot * 4;
+    let right = rc.right - scale(2, st.dpi);
+    let bottom = rc.bottom - scale(2, st.dpi);
+    for i in 1..=3 {
+        for j in 1..=3 {
+            if i + j > 4 {
+                continue;
+            }
+            let cell = RECT {
+                left: right - i * pitch,
+                top: bottom - j * pitch,
+                right: right - i * pitch + dot,
+                bottom: bottom - j * pitch + dot,
+            };
+            let _ = FillRect(hdc, &cell, st.grip_dot);
+        }
+    }
+}
+
+/// The size grip's subclass. The control's own `WM_PAINT` fills a
+/// `COLOR_BTNFACE` square that reads as a white block on the dark dialog, so
+/// those two messages are answered here and *everything else* is forwarded —
+/// `WM_LBUTTONDOWN` in particular is what posts `SC_SIZE` to the dialog.
+unsafe extern "system" fn grip_proc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+    _id: usize,
+    dlg: usize,
+) -> LRESULT {
+    let dlg = HWND(dlg as *mut core::ffi::c_void);
+    // Children are destroyed before the dialog frees its state, so a late paint
+    // after `WM_NCDESTROY` must not dereference a null `GWLP_USERDATA`.
+    if GetWindowLongPtrW(dlg, GWLP_USERDATA) == 0 {
+        return DefSubclassProc(hwnd, msg, wparam, lparam);
+    }
+    match msg {
+        WM_ERASEBKGND => LRESULT(1),
+        WM_PAINT => {
+            let mut ps = PAINTSTRUCT::default();
+            let hdc = BeginPaint(hwnd, &mut ps);
+            if !hdc.0.is_null() {
+                paint_grip(dlg, hwnd, hdc);
+            }
+            let _ = EndPaint(hwnd, &ps);
+            LRESULT(0)
+        }
+        _ => DefSubclassProc(hwnd, msg, wparam, lparam),
     }
 }
 
@@ -1227,6 +1494,17 @@ unsafe extern "system" fn dialog_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lpar
         }
         WM_COMMAND => on_command(hwnd, wparam),
         WM_NOTIFY => on_notify(hwnd, lparam),
+        // The self-painted header has no `SysHeader32` to resize its columns,
+        // so the band's dividers are the drag handles.
+        WM_LBUTTONDOWN => on_lbutton_down(hwnd, lparam),
+        WM_LBUTTONUP => on_lbutton_up(hwnd),
+        WM_MOUSEMOVE => on_mouse_move(hwnd, lparam),
+        // Losing the capture to another window ends the drag without an up.
+        WM_CAPTURECHANGED => {
+            state_mut(hwnd).drag = None;
+            0
+        }
+        WM_SETCURSOR => on_set_cursor(hwnd, wparam, lparam),
         WM_SIZE => {
             let w = (lparam.0 & 0xFFFF) as i32;
             let h = ((lparam.0 >> 16) & 0xFFFF) as i32;
@@ -1310,6 +1588,9 @@ unsafe extern "system" fn dialog_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lpar
                     let _ = RemoveWindowSubclass(edit, Some(key_edit_proc), 1);
                 }
             }
+            if let Some(grip) = item(hwnd, ID_GRIP) {
+                let _ = RemoveWindowSubclass(grip, Some(grip_proc), GRIP_SUBCLASS);
+            }
             0
         }
         WM_NCDESTROY => {
@@ -1321,6 +1602,7 @@ unsafe extern "system" fn dialog_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lpar
                 let _ = DeleteObject(HGDIOBJ(b.bg.0));
                 let _ = DeleteObject(HGDIOBJ(b.face.0));
                 let _ = DeleteObject(HGDIOBJ(b.edge.0));
+                let _ = DeleteObject(HGDIOBJ(b.grip_dot.0));
             }
             0
         }
@@ -1395,7 +1677,8 @@ mod tests {
         }
     }
 
-    /// the last one may leave the list's right edge unpainted.
+    /// The starting widths leave room to the right of the fourth column, so a
+    /// widened dialog has space for the user to drag any divider into.
     #[test]
     fn columns_are_the_measured_widths() {
         assert_eq!(COLUMNS, [59, 144, 120, 160]);
@@ -1435,6 +1718,202 @@ mod tests {
             body.contains("dark_theme_children"),
             "the visual style needs its dark sub-app name"
         );
+    }
+
+    /// A resize re-places thirteen controls. The dialog carries
+    /// `WS_CLIPCHILDREN`, so invalidating only the parent cannot repaint a
+    /// single child: the vacated rectangles keep their old borders and the
+    /// moved controls keep the half-bitmap `SetWindowPos` copied across.
+    /// `grepdlg`'s layout has the same subtree-wide repaint for the same reason.
+    #[test]
+    fn a_resize_repaints_the_whole_child_tree() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("src/win32/shortcutdlg.rs");
+        let src = std::fs::read_to_string(&path).expect("shortcutdlg.rs");
+        let body = src.split("mod tests {").next().unwrap();
+        let layout = body
+            .split("unsafe fn layout(")
+            .nth(1)
+            .expect("layout")
+            .split("unsafe fn init_list(")
+            .next()
+            .unwrap();
+        for needed in [
+            "SWP_NOCOPYBITS",
+            "RedrawWindow",
+            "RDW_INVALIDATE",
+            "RDW_ERASE",
+            "RDW_ALLCHILDREN",
+            "RDW_UPDATENOW",
+        ] {
+            assert!(
+                layout.contains(needed),
+                "layout needs {needed} or a resize leaves stale child bits"
+            );
+        }
+        assert!(
+            !layout.contains("InvalidateRect(Some(dlg)"),
+            "invalidating only the dialog cannot reach past WS_CLIPCHILDREN"
+        );
+    }
+
+    /// The painted separators and the drag handles must be the same geometry.
+    /// At 96 DPI the four widths are 59/144/120/160 from a 10 px margin, so the
+    /// four dividers sit at 69/213/333/493 and the band runs from y=37 to y=61.
+    /// The fourth is the right edge of 说明 — without it the last column cannot
+    /// be resized at all.
+    #[test]
+    fn divider_hit_test_follows_the_live_widths() {
+        let cols = COLUMNS;
+        assert_eq!(
+            [0, 1, 2, 3].map(|i| divider_x(&cols, 1.0, i)),
+            [69, 213, 333, 493]
+        );
+        for (i, x) in [69, 213, 333, 493].iter().enumerate() {
+            assert_eq!(
+                divider_at(&cols, 1.0, POINT { x: *x, y: 45 }),
+                Some(i),
+                "divider {i}"
+            );
+            // ±4 is the grab width; ±5 is already outside.
+            assert_eq!(divider_at(&cols, 1.0, POINT { x: x + 4, y: 45 }), Some(i));
+            assert_eq!(divider_at(&cols, 1.0, POINT { x: x + 5, y: 45 }), None);
+        }
+        // Only the band is live: the filter above and the list below own theirs.
+        assert_eq!(divider_at(&cols, 1.0, POINT { x: 69, y: 20 }), None);
+        assert_eq!(divider_at(&cols, 1.0, POINT { x: 69, y: 61 }), None);
+        assert_eq!(divider_at(&cols, 1.0, POINT { x: 400, y: 45 }), None);
+
+        // Drag column 0 out to 100: its own divider moves and *all* later ones
+        // slide with it, which is what the cumulative draw in `paint_header` does.
+        let mut dragged = cols;
+        dragged[0] = 100;
+        assert_eq!(divider_x(&dragged, 1.0, 0), 110);
+        assert_eq!(divider_x(&dragged, 1.0, 1), 254);
+        assert_eq!(divider_at(&dragged, 1.0, POINT { x: 110, y: 45 }), Some(0));
+        assert_eq!(divider_at(&cols, 1.0, POINT { x: 110, y: 45 }), None);
+
+        // Widening only the last column moves only its own divider.
+        let mut last = cols;
+        last[3] = 220;
+        assert_eq!(divider_x(&last, 1.0, 3), 553);
+        assert_eq!(divider_at(&last, 1.0, POINT { x: 553, y: 45 }), Some(3));
+        assert_eq!(divider_at(&last, 1.0, POINT { x: 493, y: 45 }), None);
+    }
+
+    /// Four columns means four handles, and the fourth needs a *visible* line
+    /// to grab. The old loop stopped at `i + 1 < captions.len()` and the hit
+    /// test used `(0..3)`, which together made the last column fixed-width.
+    #[test]
+    fn the_last_column_has_both_a_handle_and_a_visible_edge() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("src/win32/shortcutdlg.rs");
+        let src = std::fs::read_to_string(&path).expect("shortcutdlg.rs");
+        let body = src.split("mod tests {").next().unwrap();
+        let paint = body
+            .split("unsafe fn paint_header(")
+            .nth(1)
+            .expect("paint_header")
+            .split("/// The x of divider")
+            .next()
+            .unwrap();
+        let hit = body
+            .split("fn divider_at(")
+            .nth(1)
+            .expect("divider_at")
+            .split("/// A mouse message")
+            .next()
+            .unwrap();
+        assert!(
+            !paint.contains("i + 1 < HEADER_CAPTIONS.len()"),
+            "skipping the last separator leaves 说明 with no handle to grab"
+        );
+        assert!(
+            paint.contains("x < band.right"),
+            "the last edge must be clipped to the band, not omitted"
+        );
+        assert!(
+            hit.contains("0..cols.len()") && !hit.contains("(0..3)"),
+            "the hit test must cover all four dividers"
+        );
+    }
+
+    /// The header is ours, but the data columns belong to comctl32: it draws
+    /// the vertical separators from `LVM_INSERTCOLUMNW`. A drag that only
+    /// updated the painted band would leave the rows' dividers where they were.
+    #[test]
+    fn a_drag_writes_both_the_band_and_the_list() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("src/win32/shortcutdlg.rs");
+        let src = std::fs::read_to_string(&path).expect("shortcutdlg.rs");
+        let body = src.split("mod tests {").next().unwrap();
+        let drag = body
+            .split("unsafe fn drag_divider(")
+            .nth(1)
+            .expect("drag_divider")
+            .split("/// `WM_SETCURSOR`")
+            .next()
+            .unwrap();
+        for needed in [
+            "state_mut(dlg).cols[d.index] = w",
+            "LVM_SETCOLUMNWIDTH",
+            "WPARAM(d.index)",
+            "MIN_COL_W",
+            "used_before",
+            "client.right - 2 * margin",
+            "invalidate_header(dlg)",
+        ] {
+            assert!(drag.contains(needed), "a drag needs {needed}");
+        }
+        assert!(
+            body.contains("for (i, w) in st.cols.iter().enumerate()"),
+            "the list's initial columns must come from the same widths"
+        );
+        assert!(
+            body.contains("let w = st.cols[i];"),
+            "the painted header must read the live widths"
+        );
+        assert!(body.contains("SetCapture(dlg)") && body.contains("ReleaseCapture()"));
+        assert!(
+            body.contains("on_lbutton_down(hwnd, lparam)")
+                && body.contains("point_of(lparam)")
+                && body.contains("on_mouse_move(hwnd, lparam)"),
+            "the drag has to read the message's coordinates so a PostMessage probe can drive it"
+        );
+    }
+
+    /// The size grip is still the control's for hit-testing: only its erase and
+    /// paint are taken over. Anything that swallows the mouse messages would
+    /// cost the corner its `SC_SIZE`, and any system colour in the paint would
+    /// bring the light square back.
+    #[test]
+    fn the_grip_is_repainted_dark_without_losing_the_resize() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("src/win32/shortcutdlg.rs");
+        let src = std::fs::read_to_string(&path).expect("shortcutdlg.rs");
+        let body = src.split("mod tests {").next().unwrap();
+        for needed in [
+            "SetWindowSubclass(",
+            "Some(grip_proc)",
+            "GRIP_SUBCLASS",
+            "WM_ERASEBKGND => LRESULT(1)",
+            "WM_PAINT => {",
+            "paint_grip(dlg, hwnd, hdc)",
+            "DefSubclassProc(hwnd, msg, wparam, lparam)",
+            "st.bg",
+            "st.grip_dot",
+        ] {
+            assert!(body.contains(needed), "the grip needs {needed}");
+        }
+        // `COLOR_BTNFACE` is named in the comment above; scan for the *calls*
+        // that would actually put system colours back into the paint.
+        for gone in ["DrawFrameControl", "DFCS_SCROLLSIZE", "GetSysColor"] {
+            assert!(
+                !body.contains(gone),
+                "{gone} would put a system-coloured square back in the corner"
+            );
+        }
+        assert!(body.contains("RemoveWindowSubclass(grip"));
     }
 
     /// Every listed command has a name.
