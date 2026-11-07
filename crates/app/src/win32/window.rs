@@ -6790,7 +6790,10 @@ impl EditorState {
 
     /// Cycles to the next theme —
     /// switches themes from its
-    /// Theme menu.
+    /// Theme menu. The choice is
+    /// persisted, so the next start
+    /// comes up on the theme it
+    /// stopped at.
     fn theme_next(&mut self, hwnd: HWND) {
         let n = self.theme_names.len();
         if n == 0 {
@@ -6799,18 +6802,49 @@ impl EditorState {
         for _ in 0..n {
             self.theme_idx = (self.theme_idx + 1) % n;
             let name = self.theme_names[self.theme_idx].clone();
-            if self.apply_theme_by_name(&name).is_some() {
+            if let Some(canonical) = self.apply_theme_by_name(&name) {
+                // 菜单换的也是正式选择，落盘和对话框那一条是同一份：不写的话
+                // 重启装回的还是上一个，菜单的对勾和 setting.ini 各说各话。
+                self.persist_theme_choice(&canonical);
                 // 换主题也可能换掉了 `[Metrics]` / `[Fonts]`：条高和字体是按
                 // 「字体量出来多少」定的，不重算就只是颜色变了、尺寸没变。
                 self.refresh_metrics_and_fonts(hwnd);
                 // 换了一个主题就换了一个「可能有外部副本」的文件名：重新判断
                 // 要不要盯着它，并把指纹重置成刚读进来的那一版。
                 self.sync_theme_watch(hwnd);
+                // 主题对话框可能正开着：让它跟着换衣裳（框没开着时是空操作）。
+                super::themedlg::retheme(&self.docs.act().theme);
                 unsafe {
                     let _ = InvalidateRect(Some(hwnd), None, false);
                 }
                 return;
             }
+        }
+    }
+
+    /// 把主题对话框里选中的那个装上去（应用 按钮 = 切换主题），返回装上了没有。
+    ///
+    /// 名单先重读一遍：对话框里 `+` 刚复制出来的主题不在启动那份名单里，不重读
+    /// 就只能得到「找不到」。`theme_idx` 跟着对话框走 —— 热重载轮询和主题菜单
+    /// 都按它找「当前生效」的那个；装失败（多半是外部那份写坏了）时屏幕保持
+    /// 原样，但用户正开着对话框改它，改好了下一跳就装上。装上的同时把选择
+    /// 落盘，少了这一步就是「切完重启又变回去」。
+    fn switch_to_theme(&mut self, name: &str) -> bool {
+        self.refresh_theme_list();
+        let Some(idx) = self
+            .theme_names
+            .iter()
+            .position(|n| n.eq_ignore_ascii_case(name))
+        else {
+            return false;
+        };
+        self.theme_idx = idx;
+        match self.apply_theme_by_name(name) {
+            Some(canonical) => {
+                self.persist_theme_choice(&canonical);
+                true
+            }
+            None => false,
         }
     }
 
@@ -6826,6 +6860,29 @@ impl EditorState {
         self.setting_key(key)
             .and_then(|name| self.theme_file_for(&name).map(|(canonical, _)| canonical))
             .unwrap_or_else(|| fallback.to_string())
+    }
+
+    /// 换了生效主题要落盘的两个键：这一副面孔绑定的那套 + 共用的 `EditTheme`。
+    ///
+    /// 开机那一头（`initial_theme_name`）是两种读法：总开关存过的机器读前一个，
+    /// 没存过的读后一个 —— 只写一个，总有一边「重启又变回去」。
+    fn theme_choice_keys(dark: bool) -> [&'static str; 2] {
+        if dark {
+            ["DarkEditTheme", "EditTheme"]
+        } else {
+            ["LightEditTheme", "EditTheme"]
+        }
+    }
+
+    /// 把这次的主题选择写进 `setting.ini`，下一次开机才装得回来。
+    ///
+    /// 两个键写同一个名字，和 查看 → 深色主题 的落盘一个规矩（那边本来就要
+    /// 两个键说同一件事）。没有配置文件时写不进去就放弃 —— 和其它设置一样，
+    /// 这里不替用户发明一份。
+    fn persist_theme_choice(&self, canonical: &str) {
+        for key in Self::theme_choice_keys(self.dark_theme) {
+            self.persist_setting_key("Setting", key, canonical);
+        }
     }
 
     /// 查看 → 深色主题 (1711)：把总开关拨过去，落盘，然后问一句要不要重新启动。
@@ -27195,20 +27252,39 @@ unsafe extern "system" fn window_proc(
             LRESULT(0)
         }
         themedlg::WM_THEME_DLG => {
-            // 主题对话框改完一个色号（或按下 应用）：把那个主题重新装一遍，
-            // 不用等热重载那 700 ms。装的是**对话框里选中的**那个 —— 用户可能正
-            // 在改一个不是当前生效的主题，那就只写文件，不动屏幕。
+            // 主题对话框改完一个色号：把那个主题重新装一遍，不用等热重载那
+            // 700 ms。装的是**对话框里选中的**那个，而且只在它就是生效主题时
+            // 才装 —— 用户可能正在改一个不生效的主题，那就只写文件，不动屏幕。
+            // 应用 按钮发的是 [`SWITCH`]，把选中的装上去、不管生效的是不是它：
+            // 那是切换主题。以前这条被「只装生效主题」挡住，选一个别的再按
+            // 应用 等于没按，对话框里就没有任何切换主题的路了。
             let want = themedlg::current_name();
             if let (Some(st), Some(name)) = (state_mut(hwnd), want) {
-                let live = st.theme_names.get(st.theme_idx).cloned().unwrap_or_default();
-                if live.eq_ignore_ascii_case(&name) {
-                    st.apply_theme_by_name(&name);
-                    // 改的可能不是颜色而是 `[Metrics]` 的一行：状态栏/页签/菜单
-                    // 的高度是字体量出来的，`recompose` 只改了静态表 —— 少了这一
-                    // 步，改 `status.height` 就只是「文件变了，屏幕上没动」。
-                    st.refresh_metrics_and_fonts(hwnd);
-                    st.relayout(hwnd);
-                    st.repaint_all_chrome(hwnd);
+                if wparam.0 == themedlg::SWITCH {
+                    if st.switch_to_theme(&name) {
+                        // 换上的主题可能带着不同的 `[Metrics]` / `[Fonts]`：
+                        // 条高是字体量出来的，跟切换菜单那条路算的是同一套。
+                        st.refresh_metrics_and_fonts(hwnd);
+                        st.relayout(hwnd);
+                        st.repaint_all_chrome(hwnd);
+                        // 对话框自己也跟着换衣裳，不然编辑器换了、框还是旧色。
+                        super::themedlg::retheme(&st.docs.act().theme);
+                        let _ = unsafe { InvalidateRect(Some(hwnd), None, false) };
+                    }
+                    // 轮询盯着「对话框选中的」那份文件：装失败时用户多半正开
+                    // 着对话框改它，改好了下一跳就装上。
+                    st.sync_theme_watch(hwnd);
+                } else {
+                    let live = st.theme_names.get(st.theme_idx).cloned().unwrap_or_default();
+                    if live.eq_ignore_ascii_case(&name) {
+                        st.apply_theme_by_name(&name);
+                        // 改的可能不是颜色而是 `[Metrics]` 的一行：状态栏/页签/菜单
+                        // 的高度是字体量出来的，`recompose` 只改了静态表 —— 少了这一
+                        // 步，改 `status.height` 就只是「文件变了，屏幕上没动」。
+                        st.refresh_metrics_and_fonts(hwnd);
+                        st.relayout(hwnd);
+                        st.repaint_all_chrome(hwnd);
+                    }
                 }
             }
             LRESULT(0)
@@ -27913,6 +27989,38 @@ mod theme_init_tests {
         assert_eq!(st.apply_theme_by_name("No Such Theme"), None);
         // the document keeps the theme it already had
         assert_eq!(st.docs.act().theme.background.to_u32(), 0x1E2126);
+    }
+
+    #[test]
+    fn the_dialogs_apply_switches_to_the_selected_theme() {
+        // 应用 = 切换：选中的名字和生效的不是同一个也要装 —— 以前这条被
+        // 「只重装生效主题」挡住，选一个别的再按等于没按。
+        let mut st = EditorState::new().expect("GDI");
+        assert!(st.switch_to_theme("fish"));
+        // the menu index follows the dialog, so hot reload and the
+        // theme menu now describe the applied theme
+        assert_eq!(st.theme_names[st.theme_idx], "Fish");
+        assert_eq!(st.docs.act().theme.background.to_u32(), 0x102026);
+        // a name nobody has does not move the index, and the
+        // document keeps the theme it already had
+        assert!(!st.switch_to_theme("No Such Theme"));
+        assert_eq!(st.theme_names[st.theme_idx], "Fish");
+        assert_eq!(st.docs.act().theme.background.to_u32(), 0x102026);
+    }
+
+    #[test]
+    fn a_switched_theme_is_written_where_boot_reads_it() {
+        // 开机那一头有两种读法：总开关存过的机器读这一副面孔绑定的键，没存过的
+        // 读 `EditTheme`。落盘两边都写（和 查看 → 深色主题 同一个规矩），少一个
+        // 就是「切完重启又变回去」。
+        assert_eq!(
+            EditorState::theme_choice_keys(true),
+            ["DarkEditTheme", "EditTheme"]
+        );
+        assert_eq!(
+            EditorState::theme_choice_keys(false),
+            ["LightEditTheme", "EditTheme"]
+        );
     }
 
     #[test]

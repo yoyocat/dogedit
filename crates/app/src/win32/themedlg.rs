@@ -18,9 +18,13 @@
 //!   writes an ini. It copies the bundled text out first if the user has never
 //!   edited this theme.
 //!
-//! The dialog does **not** re-install the theme itself. The frame watches the
-//! file (fingerprint every 700 ms) and reloads on its own; 应用 just skips the
-//! wait by posting [`WM_THEME_DLG`] with [`APPLY`].
+//! The dialog does **not** re-install the theme on its own. The frame watches
+//! the file (fingerprint every 700 ms) and reloads on its own, so a key edit
+//! only posts [`WM_THEME_DLG`] with [`APPLY`] to skip the wait — and that one
+//! reinstalls **only if the selected theme is the live one**: the user may be
+//! editing a theme that is not in effect, and then the writes stay in the
+//! file. Switching is the 应用 button's job: it posts [`SWITCH`], which
+//! installs the selected theme whatever the live one is.
 
 #![allow(unsafe_op_in_unsafe_fn)]
 
@@ -89,7 +93,14 @@ use dg_skin::metrics::Clamp;
 pub(super) const WM_THEME_DLG: u32 = WM_APP + 0x4D;
 
 /// 把当前选中的主题装回去 —— 跳过热重载那 700 ms 的等待。
+///
+/// 只在「选中的就是生效主题」时重装：改键落盘走的是它，用户改一个没生效的
+/// 主题时只写文件，屏幕不动。
 pub(super) const APPLY: usize = 0;
+
+/// 把对话框里选中的主题装上去，**哪怕它不是当前生效的那个** —— 那就是切换
+/// 主题，应用 按钮发的是它。
+pub(super) const SWITCH: usize = 1;
 
 const LIST_CLASS: &str = "ListBox";
 const BUTTON_CLASS: &str = "Button";
@@ -347,6 +358,47 @@ pub(super) fn current_name() -> Option<String> {
     let dlg = dlg_hwnd()?;
     let st = unsafe { state(dlg) };
     st.names.borrow().get(st.cur.get()).cloned()
+}
+
+/// 生效主题刚被换掉（应用 装上了一个新的）：对话框自己也跟上。
+///
+/// 表里每一格、左列表每一行的颜色每轮自绘都读 [`Dlg`] 里那份快照，把它换掉
+/// 就够；要动手的是建窗时造的那四把刷子和建表时设过一次的表底/表字色 ——
+/// 不换的话编辑器已经换了衣裳，对话框还穿着上一件。子控件的深浅（滚动条、
+/// 表头）也得重新声明一遍。框没开着就是无事可做。
+pub(super) fn retheme(theme: &Theme) {
+    let Some(dlg) = dlg_hwnd() else {
+        return;
+    };
+    unsafe {
+        let st = &mut *(GetWindowLongPtrW(dlg, GWLP_USERDATA) as *mut Dlg);
+        st.theme = theme.clone();
+        let dark = chrome::theme_is_dark(&st.theme);
+        // 四把刷子按建窗时同一个配方重造：先还旧的，再要新的。
+        for (slot, color) in [
+            (&mut st.bg, st.theme.background),
+            (&mut st.face, st.theme.panel_bg),
+            (
+                &mut st.face_hot,
+                luma_blend(st.theme.foreground, st.theme.panel_bg, 0.08),
+            ),
+            (&mut st.edge, st.theme.indent_line),
+        ] {
+            let _ = DeleteObject(HGDIOBJ(slot.0));
+            *slot = CreateSolidBrush(to_colorref(color));
+        }
+        for id in [ID_GRID, ID_METRICS, ID_FONTS, ID_SHAPES] {
+            if let Some(grid) = item(dlg, id) {
+                let bg = to_colorref(st.theme.background).0 as isize;
+                let fg = to_colorref(st.theme.foreground).0 as isize;
+                let _ = SendMessageW(grid, LVM_SETBKCOLOR, Some(WPARAM(0)), Some(LPARAM(bg)));
+                let _ = SendMessageW(grid, LVM_SETTEXTBKCOLOR, Some(WPARAM(0)), Some(LPARAM(bg)));
+                let _ = SendMessageW(grid, LVM_SETTEXTCOLOR, Some(WPARAM(0)), Some(LPARAM(fg)));
+            }
+        }
+        chrome::dark_theme_children(dlg, dark);
+        let _ = InvalidateRect(Some(dlg), None, true);
+    }
 }
 
 pub(super) struct Request<'a> {
@@ -1820,7 +1872,8 @@ unsafe fn on_command(dlg: HWND, wparam: WPARAM, lparam: LPARAM) -> isize {
             return 1;
         }
         ID_APPLY => {
-            let _ = PostMessageW(Some(st.frame), WM_THEME_DLG, WPARAM(APPLY), LPARAM(0));
+            // 应用 = 切换主题：装的是**选中的**那个，不是生效的那个。
+            let _ = PostMessageW(Some(st.frame), WM_THEME_DLG, WPARAM(SWITCH), LPARAM(0));
             set_status(dlg, "已应用");
             return 1;
         }
