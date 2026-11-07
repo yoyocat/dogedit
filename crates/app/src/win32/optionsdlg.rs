@@ -1665,7 +1665,7 @@ impl Shell {
         for (id, hwnd, ctx) in pages {
             let changed = match id {
                 246 => session_apply(self, hwnd),
-                215 => language_apply(self, &*ctx, hwnd),
+                215 => language_apply(self, &mut *ctx, hwnd),
                 285 => save_apply(self, hwnd),
                 286 => proxy_apply(self, hwnd),
                 244 => hex_apply(self, hwnd),
@@ -5217,73 +5217,140 @@ unsafe fn web_apply(sh: &mut Shell, ctx: &mut NativeCtx, hwnd: HWND) -> bool {
     true
 }
 
+/// The language list sorts its own rows, so a row number is not an index into
+/// `ctx.langs`. Every row carries `index + 1` as item data; 0 (or an error)
+/// means a row without a language behind it.
+fn language_index_from_item_data(data: isize, len: usize) -> Option<usize> {
+    usize::try_from(data)
+        .ok()?
+        .checked_sub(1)
+        .filter(|&index| index < len)
+}
+
+/// The row that shows `wanted`, searched by item data rather than by number.
+fn language_row_for_item(rows: &[Option<usize>], wanted: usize) -> usize {
+    rows.iter()
+        .position(|&index| index == Some(wanted))
+        .unwrap_or(0)
+}
+
+/// Which `ctx.langs` entry `[Setting] Language` names. `None` — an empty or
+/// missing key — is the follow-system row at index 0; every real language
+/// starts at 1 and carries its LCID in `stem`. A written value whose table
+/// has since disappeared has no row, so the page highlights the language
+/// actually in force instead of claiming a table the program did not load.
+fn language_index_of(items: &[LangItem], code: u32) -> Option<usize> {
+    items
+        .iter()
+        .position(|item| item.stem.parse::<u32>().ok() == Some(code))
+}
+
+fn language_index_for(items: &[LangItem], configured: Option<u32>, loaded: Option<u32>) -> usize {
+    match configured {
+        None => 0,
+        Some(code) => language_index_of(items, code)
+            .or_else(|| loaded.and_then(|code| language_index_of(items, code)))
+            .unwrap_or(0),
+    }
+}
+
+unsafe fn language_item_at(ctx: &NativeCtx, hwnd: HWND, row: usize) -> Option<usize> {
+    let Ok(list) = GetDlgItem(Some(hwnd), 1200) else {
+        return None;
+    };
+    let data = SendMessageW(list, LB_GETITEMDATA, Some(WPARAM(row)), None).0;
+    language_index_from_item_data(data, ctx.langs.len())
+}
+
 unsafe fn language_show(ctx: &NativeCtx, hwnd: HWND) {
-    if let Some(item) = ctx.langs.get(ctx.sel) {
+    if let Some(item) = language_item_at(ctx, hwnd, ctx.sel).and_then(|i| ctx.langs.get(i)) {
         set_ctl_text(hwnd, 1202, &item.author);
         set_ctl_text(hwnd, 1203, &item.home);
     }
 }
 
 unsafe fn language_load(ctx: &mut NativeCtx, hwnd: HWND) {
-    ctx.langs = crate::win32::lang::available()
-        .into_iter()
-        .map(|item| LangItem {
-            stem: item.code.to_string(),
-            name: item.name,
-            author: item.author,
-            home: item.home,
-        })
-        .collect();
-    ctx.sel = 0;
+    // Row 0 is not a language file: its empty `stem` clears `[Setting]
+    // Language`, which is how startup goes back to following the system UI
+    // language. It rides the sorted listbox as an ordinary item with item
+    // data, so it has no fixed position among the real languages.
+    let follow = crate::win32::lang::follow_system_caption();
+    ctx.langs = std::iter::once(LangItem {
+        stem: String::new(),
+        name: follow,
+        author: String::new(),
+        home: String::new(),
+    })
+    .chain(crate::win32::lang::available().into_iter().map(|item| LangItem {
+        stem: item.code.to_string(),
+        name: item.name,
+        author: item.author,
+        home: item.home,
+    }))
+    .collect();
     let configured = ctx
         .shell
         .as_ref()
         .and_then(|sh| (*sh).ini.get("Setting", "Language"))
         .unwrap_or_default();
-    let wanted = if configured.trim().is_empty() {
-        crate::win32::lang::current_code().unwrap_or(0)
-    } else {
-        configured
-            .trim()
-            .trim_end_matches(".lng")
-            .parse::<u32>()
-            .unwrap_or(0)
+    // A written value may be a name (`zh-CN`), so the same parser the loader
+    // uses decides which row to highlight. Empty/missing is the follow-system
+    // row, not the table the system happened to resolve to this time.
+    let wanted_index = language_index_for(
+        &ctx.langs,
+        crate::win32::lang::parse_language_value(&configured),
+        crate::win32::lang::current_code(),
+    );
+    let Ok(list) = GetDlgItem(Some(hwnd), 1200) else {
+        return;
     };
-    if let Some(index) = ctx
-        .langs
-        .iter()
-        .position(|item| item.stem.parse::<u32>().ok() == Some(wanted))
-    {
-        ctx.sel = index;
-    }
-    ctx.sel0 = ctx.sel;
-    if let Ok(list) = GetDlgItem(Some(hwnd), 1200) {
-        let _ = SendMessageW(list, LB_RESETCONTENT, None, None);
-        for item in &ctx.langs {
-            let wide: Vec<u16> = item.name.encode_utf16().chain([0]).collect();
-            SendMessageW(
+    let _ = SendMessageW(list, LB_RESETCONTENT, None, None);
+    for (index, item) in ctx.langs.iter().enumerate() {
+        let wide: Vec<u16> = item.name.encode_utf16().chain([0]).collect();
+        let row = SendMessageW(
+            list,
+            LB_ADDSTRING,
+            None,
+            Some(LPARAM(wide.as_ptr() as isize)),
+        )
+        .0;
+        if row >= 0 {
+            let _ = SendMessageW(
                 list,
-                LB_ADDSTRING,
-                None,
-                Some(LPARAM(wide.as_ptr() as isize)),
+                LB_SETITEMDATA,
+                Some(WPARAM(row as usize)),
+                Some(LPARAM(index as isize + 1)),
             );
         }
-        SendMessageW(list, LB_SETCURSEL, Some(WPARAM(ctx.sel)), None);
     }
+    let count = SendMessageW(list, LB_GETCOUNT, None, None).0.max(0) as usize;
+    let rows: Vec<Option<usize>> = (0..count)
+        .map(|row| language_item_at(ctx, hwnd, row))
+        .collect();
+    ctx.sel = language_row_for_item(&rows, wanted_index);
+    ctx.sel0 = ctx.sel;
+    SendMessageW(list, LB_SETCURSEL, Some(WPARAM(ctx.sel)), None);
     language_show(ctx, hwnd);
 }
 
-unsafe fn language_apply(sh: &mut Shell, ctx: &NativeCtx, hwnd: HWND) -> bool {
+unsafe fn language_apply(sh: &mut Shell, ctx: &mut NativeCtx, hwnd: HWND) -> bool {
     let sel = GetDlgItem(Some(hwnd), 1200)
         .map(|list| SendMessageW(list, LB_GETCURSEL, None, None).0 as isize)
         .unwrap_or(-1);
     if sel < 0 || sel as usize == ctx.sel0 {
         return false;
     }
-    let Some(item) = ctx.langs.get(sel as usize) else {
+    let Some(item) =
+        language_item_at(ctx, hwnd, sel as usize).and_then(|index| ctx.langs.get(index))
+    else {
         return false;
     };
+    // The follow-system row has an empty stem: `Language=` reads back as
+    // absent, which is exactly the "follow the system" setting.
     sh.ini.set("Setting", "Language", &item.stem);
+    // The applied row is the new baseline: switching back before 确定 has to
+    // write the old value again, not count as "nothing changed".
+    ctx.sel0 = sel as usize;
     // The 需重启 caption: the language table cannot be swapped under
     // live windows.
     let message = crate::win32::lang::string(15087)
@@ -6225,5 +6292,131 @@ mod tests {
         assert!(row_image(&row) == IMG_EDIT);
         row.text = "C:\\done.wav".into();
         assert!(row_text(&row).ends_with("C:\\done.wav"));
+    }
+
+    /// Empty `[Setting] Language` is a setting of its own, not "whatever
+    /// table the system happened to load". The follow-system row has no LCID
+    /// and writes an empty value, which `Ini::get` reads back as absent.
+    #[test]
+    fn a_follow_system_row_is_a_setting_not_a_language() {
+        let item = |stem: &str, name: &str| LangItem {
+            stem: stem.to_string(),
+            name: name.to_string(),
+            author: String::new(),
+            home: String::new(),
+        };
+        let items = vec![
+            item("", "Follow system"),
+            item("1033", "English"),
+            item("2052", "中文(简体)"),
+        ];
+        assert_eq!(
+            language_index_for(&items, None, Some(1033)),
+            0,
+            "an empty key must not highlight the table the system resolved to"
+        );
+        assert_eq!(language_index_for(&items, Some(1033), None), 1);
+        assert_eq!(language_index_for(&items, Some(2052), None), 2);
+        // zh-TW has no table: the loader fell back to English, so the page
+        // highlights what is actually on screen.
+        assert_eq!(language_index_for(&items, Some(1028), Some(1033)), 1);
+        assert_eq!(language_index_for(&items, Some(1028), None), 0);
+        let mut ini = dg_core::ini::Ini::parse("[Setting]\nLanguage=2052\n");
+        ini.set("Setting", "Language", &items[0].stem);
+        assert_eq!(ini.get("Setting", "Language"), None);
+    }
+
+    #[test]
+    fn language_rows_are_looked_up_by_item_data_not_by_number() {
+        assert_eq!(language_index_from_item_data(1, 2), Some(0));
+        assert_eq!(language_index_from_item_data(2, 2), Some(1));
+        assert_eq!(language_index_from_item_data(0, 2), None, "no data");
+        assert_eq!(language_index_from_item_data(-1, 2), None, "LB_ERR");
+        assert_eq!(language_index_from_item_data(3, 2), None, "out of range");
+        // An en-US system sorts the captions the other way round from the
+        // code order 1033, 2052: Chinese is row 0, English is row 1.
+        let rows = [Some(1), Some(0)];
+        assert_eq!(language_row_for_item(&rows, 0), 1);
+        assert_eq!(language_row_for_item(&rows, 1), 0);
+        assert_eq!(language_row_for_item(&rows, 7), 0, "unknown falls back");
+    }
+
+    /// The 语言 page's listbox carries LBS_SORT: LB_ADDSTRING puts a caption
+    /// where the control's sort says it goes, so a row number is not the
+    /// language's index. Item data is the link that survives the reordering.
+    #[test]
+    fn a_sorted_language_list_keeps_each_language_with_its_row() {
+        unsafe {
+            let parent = CreateWindowExW(
+                WINDOW_EX_STYLE::default(),
+                w!("STATIC"),
+                PCWSTR::null(),
+                WINDOW_STYLE(0x8000_0000), // WS_POPUP
+                0,
+                0,
+                200,
+                200,
+                None,
+                None,
+                Some(instance()),
+                None,
+            )
+            .expect("test parent");
+            let list = CreateWindowExW(
+                WINDOW_EX_STYLE::default(),
+                w!("LISTBOX"),
+                PCWSTR::null(),
+                WINDOW_STYLE(0x50a1_0103), // the 语言 page's listbox style
+                0,
+                0,
+                150,
+                150,
+                Some(parent),
+                Some(HMENU(1200 as *mut core::ffi::c_void)),
+                Some(instance()),
+                None,
+            )
+            .expect("test list");
+            for (index, name) in ["Follow system", "English", "Chinese (Simplified)"]
+                .iter()
+                .enumerate()
+            {
+                let wide: Vec<u16> = name.encode_utf16().chain([0]).collect();
+                let row = SendMessageW(
+                    list,
+                    LB_ADDSTRING,
+                    None,
+                    Some(LPARAM(wide.as_ptr() as isize)),
+                )
+                .0;
+                assert!(row >= 0);
+                let _ = SendMessageW(
+                    list,
+                    LB_SETITEMDATA,
+                    Some(WPARAM(row as usize)),
+                    Some(LPARAM(index as isize + 1)),
+                );
+            }
+            let count = SendMessageW(list, LB_GETCOUNT, None, None).0.max(0) as usize;
+            let (mut rows, mut names) = (Vec::new(), Vec::new());
+            for row in 0..count {
+                let data = SendMessageW(list, LB_GETITEMDATA, Some(WPARAM(row)), None).0;
+                rows.push(language_index_from_item_data(data, 3));
+                let mut buf = [0u16; 64];
+                let _ = SendMessageW(
+                    list,
+                    LB_GETTEXT,
+                    Some(WPARAM(row)),
+                    Some(LPARAM(buf.as_mut_ptr() as isize)),
+                );
+                let end = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
+                names.push(String::from_utf16_lossy(&buf[..end]));
+            }
+            assert_eq!(names, ["Chinese (Simplified)", "English", "Follow system"]);
+            assert_eq!(rows, [Some(2), Some(1), Some(0)]);
+            assert_eq!(language_row_for_item(&rows, 0), 2, "Follow system is row 2");
+            assert_eq!(language_row_for_item(&rows, 1), 1, "English is row 1");
+            let _ = DestroyWindow(parent);
+        }
     }
 }

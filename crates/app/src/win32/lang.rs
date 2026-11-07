@@ -9,7 +9,9 @@
 //! fallback, so a fresh build runs without any files next to it; a
 //! `<exe>\lang\<name>.lng` file wins when present, and dropping another one there is
 //! all a new language needs. A table named by its locale id (a Windows LCID such as
-//! `1041`) is accepted the same way. `setting.ini`'s `[Setting] Language` picks the
+//! `1041`) is accepted the same way. The system UI language is followed only when a
+//! table for it exists; a locale with no table of its own (zh-TW, zh-HK, …) falls
+//! back to English, never to Chinese. `setting.ini`'s `[Setting] Language` picks the
 //! file (an empty value means "follow the system UI language"), and a change takes
 //! effect on the next start — the same 需重启 contract the options page states.  The
 //! Chinese table is also loaded as the canonical one: every label the code carries is
@@ -86,7 +88,7 @@ fn exe_dir() -> PathBuf {
 impl Locale {
     fn load() -> Self {
         let dir = exe_dir().join("lang");
-        let wanted = configured_language().unwrap_or_else(system_language);
+        let wanted = configured_language().unwrap_or_else(|| system_language(&dir));
         let (code, current) = load_language(&dir, wanted);
         // The canonical table is always Chinese: it is the language every
         // caption in this tree was written in, so it is the key space the
@@ -233,37 +235,77 @@ impl Locale {
     }
 }
 
-/// `setting.ini` 的 `[Setting] Language`：写的值是语言表文件名（`zh-CN` 或
-/// (locale id)`2052`），空着就是「跟系统」。读的就是 [`crate::settings`] 那条路，
-/// 别再有一份自己的读取器。
-fn configured_language() -> Option<u32> {
-    let value = crate::settings::section("Setting", "Language")?;
-    let stem = value
-        .strip_suffix(".lng")
-        .or_else(|| value.strip_suffix(".LNG"))
-        .unwrap_or(&value);
+/// `[Setting] Language` 的值：语言表文件名（`zh-CN`、`zh-CN.lng`）或 locale id
+/// （`2052`）。空值当「没配」，交给系统语言决定。选项页也用这一个解析器，
+/// 免得「表里加载中文、框里却高亮英文」。
+pub(super) fn parse_language_value(value: &str) -> Option<u32> {
+    let value = value.trim();
+    let stem = if value.len() >= 4
+        && value.as_bytes()[value.len() - 4..].eq_ignore_ascii_case(b".lng")
+    {
+        &value[..value.len() - 4]
+    } else {
+        value
+    };
     code_from_stem(stem)
 }
 
-fn system_language() -> u32 {
-    let lcid = unsafe { GetUserDefaultUILanguage() } as u32;
-    // zh-TW (1028) and zh-HK (3076) have no table in this build; they read
-    // Simplified Chinese rather than falling all the way back to English.
-    if lcid & 0x3FF == 0x04 { ZH_CN } else { EN_US }
+/// `setting.ini` 的 `[Setting] Language`。读的就是 [`crate::settings`] 那条路，
+/// 别再有一份自己的读取器。
+fn configured_language() -> Option<u32> {
+    parse_language_value(&crate::settings::section("Setting", "Language")?)
 }
 
-fn language_file(dir: &Path, code: u32) -> Option<PathBuf> {
-    let mut names: Vec<String> = Vec::new();
-    match code {
-        EN_US => names.push("en-US".to_string()),
-        ZH_CN => names.push("zh-CN".to_string()),
-        _ => {}
+/// The system UI language, but only when this build actually has a table for
+/// it. An empty `[Setting] Language` means "follow the system"; following a
+/// locale we cannot display would put the UI in an unrelated language, so
+/// English is the defined default instead.
+fn system_language(dir: &Path) -> u32 {
+    let lcid = unsafe { GetUserDefaultUILanguage() } as u32;
+    system_language_for(dir, lcid)
+}
+
+/// [`system_language`] without the OS call, so the rule is testable.
+fn system_language_for(dir: &Path, lcid: u32) -> u32 {
+    if builtin(lcid).is_some() || language_file(dir, lcid).is_some() {
+        lcid
+    } else {
+        EN_US
     }
-    names.push(code.to_string());
-    names
-        .into_iter()
-        .map(|stem| dir.join(format!("{stem}.lng")))
-        .find(|path| path.is_file())
+}
+
+/// The `<exe>\lang` file that belongs to `code`. Every stem [`code_from_stem`]
+/// accepts is a valid name (`2052.lng`, `zh-CN.lng`, `ja-JP.lng`, …), so this
+/// scans by the same rule [`available()`] lists by — otherwise a dropped
+/// `zh-TW.lng` would be offered on the options page but ignored by the loader.
+/// Named stems beat a bare LCID, so the shipped `en-US.lng` / `zh-CN.lng` keep
+/// winning over `1033.lng` / `2052.lng`.
+fn language_file(dir: &Path, code: u32) -> Option<PathBuf> {
+    let mut found: Vec<PathBuf> = std::fs::read_dir(dir)
+        .ok()?
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.is_file()
+                && path
+                    .extension()
+                    .and_then(|s| s.to_str())
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("lng"))
+                && path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .and_then(code_from_stem)
+                    == Some(code)
+        })
+        .collect();
+    found.sort_by_key(|path| {
+        let numeric = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .is_some_and(|stem| stem.parse::<u32>().is_ok());
+        (numeric, path.clone())
+    });
+    found.into_iter().next()
 }
 
 fn builtin(code: u32) -> Option<&'static [u8]> {
@@ -274,27 +316,29 @@ fn builtin(code: u32) -> Option<&'static [u8]> {
     }
 }
 
+/// A parsed, non-empty table from `<exe>\lang`. An undecodable or empty file
+/// does not count as a language: the chain then moves on to the next one.
+fn read_table(dir: &Path, code: u32) -> Option<Table> {
+    let bytes = std::fs::read(language_file(dir, code)?).ok()?;
+    let table = table_from(&bytes);
+    (!table.menu.is_empty() || !table.dlg.is_empty() || !table.string.is_empty())
+        .then_some(table)
+}
+
 fn load_language(dir: &Path, wanted: u32) -> (u32, Table) {
-    if let Some(table) = language_file(dir, wanted).and_then(|p| std::fs::read(p).ok()) {
-        let parsed = table_from(&table);
-        if !parsed.menu.is_empty() || !parsed.dlg.is_empty() || !parsed.string.is_empty() {
-            return (wanted, parsed);
-        }
+    if let Some(table) = read_table(dir, wanted) {
+        return (wanted, table);
     }
     if let Some(bytes) = builtin(wanted) {
         return (wanted, table_from(bytes));
     }
-    let fallback = if wanted & 0x3FF == 0x04 { ZH_CN } else { EN_US };
-    if let Some(table) = language_file(dir, fallback).and_then(|p| std::fs::read(p).ok()) {
-        let parsed = table_from(&table);
-        if !parsed.menu.is_empty() {
-            return (fallback, parsed);
-        }
+    // No table for the requested language — not even an external one. English
+    // is the default: zh-TW (1028), zh-HK (3076) and any other LCID without a
+    // table must not silently read the Simplified Chinese one.
+    if let Some(table) = read_table(dir, EN_US) {
+        return (EN_US, table);
     }
-    if let Some(bytes) = builtin(fallback) {
-        return (fallback, table_from(bytes));
-    }
-    (fallback, Table::default())
+    (EN_US, table_from(EN_TABLE))
 }
 
 /// 解一份语言表字节再进 [`parse`]。语言表多认一种没有 BOM 的 UTF-16LE
@@ -395,6 +439,29 @@ pub(super) fn string(id: u32) -> Option<&'static str> {
         .get(&id)
         .or_else(|| loc.canonical.string.get(&id))
         .map(|s| s.as_str())
+}
+
+/// The options page's "follow system" caption. Unlike [`string`] this does not
+/// fall back to the canonical Chinese table: an external `.lng` from an older
+/// build may lack `15017`, and a Chinese row on an English UI is exactly the
+/// mismatch this setting is meant to clear up. The fallback follows the table
+/// actually in force instead.
+pub(super) fn follow_system_caption() -> String {
+    match LOCALE.get() {
+        Some(loc) => follow_system_caption_in(&loc.current, loc.code),
+        None => "Follow system".to_string(),
+    }
+}
+
+fn follow_system_caption_in(current: &Table, code: u32) -> String {
+    if let Some(text) = current.string.get(&15017) {
+        return text.clone();
+    }
+    if code == ZH_CN {
+        "跟随系统".to_string()
+    } else {
+        "Follow system".to_string()
+    }
 }
 
 /// Translates a caption the code carries as a Chinese literal. Returns `None`
@@ -691,6 +758,15 @@ mod tests {
         table_from(builtin(code).unwrap())
     }
 
+    /// A private, empty `<exe>\lang` stand-in. The two tests use different
+    /// tags so a parallel run cannot see the other one's files.
+    fn test_lang_dir(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("dogedit-lang-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
     #[test]
     fn both_builtin_tables_parse_their_sections() {
         for code in [EN_US, ZH_CN] {
@@ -707,7 +783,79 @@ mod tests {
             }));
             assert!(t.popup.contains_key(&(128, 57601)));
             assert!(t.string.contains_key(&15021));
+            assert_eq!(
+                t.string.get(&15017).map(String::as_str),
+                Some(if code == EN_US { "Follow system" } else { "跟随系统" }),
+                "the options page's follow-system caption"
+            );
         }
+    }
+
+    #[test]
+    fn every_spelling_of_a_configured_language_resolves() {
+        assert_eq!(parse_language_value(""), None);
+        assert_eq!(parse_language_value("  "), None);
+        assert_eq!(parse_language_value("2052"), Some(ZH_CN));
+        assert_eq!(parse_language_value("zh-CN"), Some(ZH_CN));
+        assert_eq!(parse_language_value("zh-CN.lng"), Some(ZH_CN));
+        assert_eq!(parse_language_value("ZH_CN.LNG"), Some(ZH_CN));
+        assert_eq!(parse_language_value(" 1033 "), Some(EN_US));
+        assert_eq!(parse_language_value("made-up"), None);
+    }
+
+    /// A locale with no table of its own must read English. The old rule
+    /// treated every Chinese-family LCID (zh-TW 1028, zh-HK 3076, …) as
+    /// Simplified Chinese even though this build ships no table for them.
+    #[test]
+    fn a_locale_without_a_table_falls_back_to_english() {
+        let dir = test_lang_dir("empty");
+        for code in [1028, 3076, 1041, 9999] {
+            assert_eq!(system_language_for(&dir, code), EN_US, "system LCID {code}");
+            let (got, table) = load_language(&dir, code);
+            assert_eq!(got, EN_US, "LCID {code} loaded the wrong table");
+            assert_eq!(
+                table.menu.get(&(128, 57601)).map(String::as_str),
+                Some("&Open…"),
+                "LCID {code} did not load English"
+            );
+        }
+        assert_eq!(system_language_for(&dir, ZH_CN), ZH_CN);
+        assert_eq!(system_language_for(&dir, EN_US), EN_US);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A dropped-in table makes its locale a real language for both the
+    /// loader and the options page's list — by language stem, not just LCID.
+    #[test]
+    fn an_external_table_for_another_locale_is_honoured() {
+        let dir = test_lang_dir("external");
+        std::fs::write(dir.join("zh-TW.lng"), "[STRING]\n15021=未命名\n15017=跟随系統\n").unwrap();
+        assert_eq!(language_file(&dir, 1028), Some(dir.join("zh-TW.lng")));
+        assert_eq!(system_language_for(&dir, 1028), 1028);
+        let (code, table) = load_language(&dir, 1028);
+        assert_eq!(code, 1028);
+        assert_eq!(
+            table.string.get(&15021).map(String::as_str),
+            Some("未命名")
+        );
+        // A named stem wins over a bare LCID file for the same language.
+        std::fs::write(dir.join("1028.lng"), "[STRING]\n15021=lcid\n").unwrap();
+        assert_eq!(language_file(&dir, 1028), Some(dir.join("zh-TW.lng")));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// An external table from an older build has no `15017`; the row still
+    /// has to be in the language that is actually on screen.
+    #[test]
+    fn the_follow_system_caption_follows_the_table_in_force() {
+        assert_eq!(follow_system_caption_in(&table(EN_US), EN_US), "Follow system");
+        assert_eq!(follow_system_caption_in(&table(ZH_CN), ZH_CN), "跟随系统");
+        let mut old_en = table(EN_US);
+        old_en.string.remove(&15017);
+        assert_eq!(follow_system_caption_in(&old_en, EN_US), "Follow system");
+        let mut old_zh = table(ZH_CN);
+        old_zh.string.remove(&15017);
+        assert_eq!(follow_system_caption_in(&old_zh, ZH_CN), "跟随系统");
     }
 
     #[test]
